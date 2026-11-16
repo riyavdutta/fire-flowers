@@ -48,7 +48,20 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-actio
 .corner{position:fixed;right:34px;bottom:30px;display:flex;gap:18px}
 .corner button{font-size:12px;letter-spacing:.1em;color:var(--dim);background:none;border:none;cursor:pointer;font-family:inherit}
 .corner button:hover{color:var(--fg)}
-@media (max-width:820px){.tray{flex-wrap:wrap;justify-content:center;gap:8px;bottom:12px;width:calc(100% - 24px)}.sep,.preview{display:none}.shell{min-width:0;padding:4px}.card{max-width:46vw;top:76px}.card .q{font-size:16px}.title h1{font-size:24px}.title p{display:none}.corner{display:none}.mode{top:auto;bottom:auto;top:60px;left:34px;transform:none}}
+.sheet{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,20,.35);z-index:6}
+.sheet[hidden]{display:none}
+.sheet-in{background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:24px;padding:22px;text-align:center;width:min(560px,calc(100% - 32px))}
+.sk{font-size:11px;letter-spacing:.24em;color:var(--dim);margin:0 0 12px}
+#snapv{position:static;inset:auto;width:100%;height:auto;border-radius:12px;display:block;cursor:default}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.opts button{font-family:inherit;color:var(--fg);background:var(--line);border:1px solid transparent;border-radius:16px;padding:14px 8px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:.2s}
+.opts button:hover{border-color:var(--fg)}
+.opts button.done{background:#3fe0a8;color:#07261b}
+.opts b{font-family:"Shippori Mincho",serif;font-weight:400;font-size:16px}.opts small{font-size:10.5px;color:var(--dim)}
+.ic{display:block;border:1.5px solid currentColor;margin-bottom:8px;height:30px}.i-card{width:42px;border-radius:2px;border-bottom-width:6px}.i-desk{width:50px;border-radius:3px}.i-phone{width:16px;height:32px;border-radius:5px}
+.sx{margin-top:12px;font-family:inherit;font-size:12px;letter-spacing:.1em;color:var(--dim);background:none;border:0;cursor:pointer}
+@media (max-width:820px){.corner{display:flex!important;top:104px;left:34px;right:auto;bottom:auto;gap:14px}.corner #free{display:none}.opts small{display:none}
+.tray{flex-wrap:wrap;justify-content:center;gap:8px;bottom:12px;width:calc(100% - 24px)}.sep,.preview{display:none}.shell{min-width:0;padding:4px}.card{max-width:46vw;top:76px}.card .q{font-size:16px}.title h1{font-size:24px}.title p{display:none}.corner{display:none}.mode{top:auto;bottom:auto;top:60px;left:34px;transform:none}}
 </style>
 </head>
 <body>
@@ -64,6 +77,7 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-actio
   <div class="colwrap"><div class="cols" id="cols"></div><div class="colhint">pick up to three</div></div>
   <canvas class="preview" id="pv" width="92" height="92"></canvas>
 </div>
+<div class="sheet" id="sheet" hidden><div class="sheet-in"><p class="sk">KEEP THIS SKY · 空を残す</p><canvas id="snapv"></canvas><div class="opts"><button data-f="card"><i class="ic i-card"></i><b>Postcard</b><small>with the date and a seal</small></button><button data-f="desk"><i class="ic i-desk"></i><b>Desktop</b><small>2560 × 1440 wallpaper</small></button><button data-f="phone"><i class="ic i-phone"></i><b>Phone</b><small>lock screen wallpaper</small></button></div><button class="sx" id="sx">close</button></div></div>
 <div class="corner"><button id="keep">keep this sky ↓</button><button id="fin" hidden>finale ✦</button><button id="snd">sound on</button><button id="free">just play →</button></div>
 
 <script>
@@ -234,6 +248,7 @@ function launch(x,y,r,type,cols,ambient=false){
   if(!ambient){rise(dur,day,x);if(!day)mortar(x)}
 }
 function burst(R){
+  if(!R.ambient)lastBX=R.x1;
   const {x1:x,y1:y,r,type,ambient,day}=R,dim=ambient?.35:1,K=2.2;
   const pal=day?DAYCOLS:COLS,cs=R.cols.map(k=>hex2(pal[k])),ca=cs[0],cb=cs[1]||cs[0],cc=cs[2]||cb;
   const add=(n,fn,o)=>{for(let i=0;i<n;i++){const u=Math.random()*2-1,ph=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u);const [dx,dy]=fn(i,n,s,ph);
@@ -347,7 +362,7 @@ function frame(now,warm){
   sx.globalCompositeOperation="source-over";
 
   const ink=mixH("#eef0ff","#3a3a66");
-  if(target){target.t+=dt;const a=target.done?Math.max(0,.6-target.t*.2):.28+.1*Math.sin(T*2);
+  if(target&&!window.CLEAN){target.t+=dt;const a=target.done?Math.max(0,.6-target.t*.2):.28+.1*Math.sin(T*2);
     sx.save();sx.setLineDash([2,7]);sx.lineWidth=1.3;sx.strokeStyle=target.col;sx.globalAlpha=a;sx.beginPath();sx.arc(target.x,target.y,target.r,0,7);sx.stroke();sx.restore()}
   if(hold){const r=sizeFor((now-hold.t0)/1000);sx.save();sx.strokeStyle=palette()[sel[0]];sx.globalAlpha=.7;sx.lineWidth=1.2;sx.setLineDash([1,5]);sx.beginPath();sx.arc(hold.x,hold.y,r,0,7);sx.stroke();sx.setLineDash([]);sx.beginPath();sx.arc(hold.x,hold.y,2.5,0,7);sx.fillStyle=ink;sx.fill();sx.restore()}
 
@@ -554,25 +569,48 @@ $("fin").onclick=()=>{ // everything you launched, again, faster, then a closing
   [.18,.34,.5,.66,.82].forEach((fx,i)=>setTimeout(()=>launch(fx*W,HZ*(.22+(i%2)*.1),200,i%2?"kiku":"botan",[all[i%all.length]]),end+i*90));
   setTimeout(()=>{finaleOn=false;$("fin").textContent="finale ✦"},end+3000);
 };
-$("keep").onclick=()=>{ // a postcard of this exact moment, with the date and a red seal
-  const PW=1600,PH=1150,m=60,iw=PW-m*2,ih=Math.round(iw*H/W),c=document.createElement("canvas");c.width=PW;c.height=Math.max(PH,ih+m*2+120);
-  const g=c.getContext("2d"),day=MODE==="day";
-  g.fillStyle="#f7f1e6";g.fillRect(0,0,c.width,c.height);
-  g.save();g.shadowColor="rgba(40,30,60,.25)";g.shadowBlur=30;g.shadowOffsetY=10;g.fillRect(m,m,iw,ih);g.restore();
-  g.drawImage(cv,0,0,cv.width,cv.height,m,m,iw,ih);
-  const ty=m+ih+70;
-  g.fillStyle="#2a2440";g.font='400 44px "Shippori Mincho", serif';g.fillText("Fire Flowers  花火",m,ty);
-  const when=new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
-  g.font='400 22px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.6)";
-  g.fillText(`${when} · ${day?"a day of flowers":"a night of fire flowers"} · ${show.length} launched`,m,ty+38);
-  // hanko: a red square seal
-  const sx0=PW-m-110,sy0=ty-62;g.save();g.translate(sx0+55,sy0+55);g.rotate(-.06);
-  g.fillStyle="#c8243c";g.fillRect(-52,-52,104,104);g.strokeStyle="#f7f1e6";g.lineWidth=3;g.strokeRect(-44,-44,88,88);
-  g.fillStyle="#f7f1e6";g.font='600 38px "Shippori Mincho", serif';g.textAlign="center";g.fillText("花",0,-4);g.fillText("火",0,36);g.restore();
-  g.font='400 16px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.45)";g.textAlign="right";g.fillText("fire-flowers.vercel.app",PW-m-130,ty+38);
-  const a=document.createElement("a");a.download=`fire-flowers-${new Date().toISOString().slice(0,10)}.png`;a.href=c.toDataURL("image/png");a.click();
-  $("keep").textContent="kept ✓";setTimeout(()=>$("keep").textContent="keep this sky ↓",2200);
+/* keep this sky: the moment is frozen when you press, then saved as a postcard or a wallpaper */
+let snap=null,lastBX=null;
+const sealAt=(g,x,y,sz,paper)=>{g.save();g.translate(x,y);g.rotate(-.06);const h=sz/2;
+  g.fillStyle="#c8243c";g.fillRect(-h,-h,sz,sz);g.strokeStyle=paper;g.lineWidth=sz*.03;g.strokeRect(-h*.85,-h*.85,sz*.85,sz*.85);
+  g.fillStyle=paper;g.font=`600 ${sz*.37}px "Shippori Mincho", serif`;g.textAlign="center";g.fillText("花",0,-sz*.04);g.fillText("火",0,sz*.35);g.restore()};
+function cover(g,src,dw,dh,cx){ // crop the frozen sky to fill dw x dh, centred on cx (0..1)
+  const sw=src.width,sh=src.height,sc=Math.max(dw/sw,dh/sh),cw=dw/sc,ch=dh/sc;
+  const x=Math.max(0,Math.min(sw-cw,cx*sw-cw/2)),y=Math.max(0,(sh-ch)/2);g.drawImage(src,x,y,cw,ch,0,0,dw,dh)}
+const FORMATS={
+ card(){const PW=1600,m=60,iw=PW-m*2,ih=Math.round(iw*snap.height/snap.width),c=document.createElement("canvas");c.width=PW;c.height=ih+m*2+120;
+   const g=c.getContext("2d"),day=MODE==="day";g.fillStyle="#f7f1e6";g.fillRect(0,0,c.width,c.height);
+   g.save();g.shadowColor="rgba(40,30,60,.25)";g.shadowBlur=30;g.shadowOffsetY=10;g.fillRect(m,m,iw,ih);g.restore();g.drawImage(snap,m,m,iw,ih);
+   const ty=m+ih+70,when=new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
+   g.fillStyle="#2a2440";g.font='400 44px "Shippori Mincho", serif';g.fillText("Fire Flowers  花火",m,ty);
+   g.font='400 22px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.6)";g.fillText(`${when} · ${day?"a day of flowers":"a night of fire flowers"} · ${show.length} launched`,m,ty+38);
+   sealAt(g,PW-m-55,ty-7,104,"#f7f1e6");
+   g.font='400 16px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.45)";g.textAlign="right";g.fillText("fire-flowers.vercel.app",PW-m-130,ty+38);return c},
+ desk(){const c=document.createElement("canvas");c.width=2560;c.height=1440;const g=c.getContext("2d");g.imageSmoothingQuality="high";
+   cover(g,snap,2560,1440,.5);sealAt(g,2560-90,1440-90,70,"#f7f1e6");return c},
+ phone(){const h=Math.min(2532,snap.height*2),w=Math.round(h*1170/2532),c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.imageSmoothingQuality="high";
+   cover(g,snap,w,h,lastBX!=null?lastBX/W:.5);sealAt(g,w/2,h-h*.06,h*.035,"#f7f1e6");return c},
 };
+const NAMES={card:"postcard",desk:"desktop",phone:"phone"};
+function saveCanvas(c,name){
+  c.toBlob(blob=>{
+    const file=new File([blob],name,{type:"image/png"});
+    // on phones the share sheet offers "Save Image" straight to Photos; elsewhere it downloads
+    if(matchMedia("(pointer:coarse)").matches&&navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:"Fire Flowers 花火"}).catch(()=>{});return}
+    const a=document.createElement("a");a.download=name;a.href=URL.createObjectURL(blob);document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+  },"image/png");
+}
+$("keep").onclick=()=>{
+  window.CLEAN=1;frame(performance.now(),true);window.CLEAN=0; // redraw once without the commission circle
+  snap=document.createElement("canvas");snap.width=cv.width;snap.height=cv.height;snap.getContext("2d").drawImage(cv,0,0);
+  const pv=$("snapv"),pg=pv.getContext("2d");pv.width=480;pv.height=Math.round(480*snap.height/snap.width);pg.drawImage(snap,0,0,pv.width,pv.height);
+  $("sheet").hidden=false;
+};
+$("sheet").addEventListener("click",e=>{
+  const b=e.target.closest("[data-f]");if(b&&snap){saveCanvas(FORMATS[b.dataset.f](),`fire-flowers-${NAMES[b.dataset.f]}-${new Date().toISOString().slice(0,10)}.png`);
+    b.classList.add("done");setTimeout(()=>b.classList.remove("done"),1600)}
+  if(e.target.id==="sx"||e.target.id==="sheet")$("sheet").hidden=true;
+});
 
 buildTray();showCommission();setTarget();addEventListener("resize",setTarget);
 const Q=new URLSearchParams(location.search);
