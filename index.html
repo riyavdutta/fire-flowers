@@ -83,7 +83,7 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-actio
   <canvas class="preview" id="pv" width="92" height="92"></canvas>
 </div>
 <div class="sheet" id="sheet" hidden><div class="sheet-in"><p class="sk">KEEP THIS SKY · 空を残す</p><canvas id="snapv"></canvas><div class="opts"><button data-f="card"><i class="ic i-card"></i><b>Postcard</b><small>with the date and a seal</small></button><button data-f="desk"><i class="ic i-desk"></i><b>Desktop</b><small>2560 × 1440 wallpaper</small></button><button data-f="phone"><i class="ic i-phone"></i><b>Phone</b><small>lock screen wallpaper</small></button></div><button class="sx" id="sx">close</button></div></div>
-<div class="corner"><button id="keep">keep this sky ↓</button><button id="fin" hidden>finale ✦</button><button id="snd">sound on</button><button id="free">just play →</button></div>
+<div class="corner"><button id="keep">keep this sky ↓</button><button id="fin">finale ✦</button><button id="snd">sound on</button><button id="free">just play →</button></div>
 
 <script>
 /* ================= data ================= */
@@ -603,14 +603,20 @@ function drawPreview(dt){
 
 /* ================= your show: finale + keepsake ================= */
 let show=[],finaleOn=false;
-function remember(x,y,r){show.push({fx:x/W,fy:y/HZ,r,type:shell,cols:sel.slice()});if(show.length>40)show.shift();$("fin").hidden=show.length<3}
-$("fin").onclick=()=>{ // everything you launched, again, faster, then a closing salvo
-  if(finaleOn||!show.length)return;audio();finaleOn=true;$("fin").textContent="✦ ✦ ✦";
-  const gap=Math.max(.12,Math.min(.35,4/show.length));
-  show.forEach((f,i)=>setTimeout(()=>launch(f.fx*W,f.fy*HZ,f.r,f.type,f.cols),i*gap*1000));
-  const end=show.length*gap*1000+500,all=[...new Set(show.flatMap(f=>f.cols))];
-  [.18,.34,.5,.66,.82].forEach((fx,i)=>setTimeout(()=>launch(fx*W,HZ*(.22+(i%2)*.1),200,i%2?"kiku":"botan",[all[i%all.length]]),end+i*90));
-  setTimeout(()=>{finaleOn=false;$("fin").textContent="finale ✦"},end+3000);
+function remember(x,y,r){show.push({fx:x/W,fy:y/HZ,r,type:shell,cols:sel.slice()});if(show.length>40)show.shift()}
+$("fin").onclick=()=>{ // a random show: every shell, every colour, building to a closing salvo
+  if(finaleOn)return;audio();finaleOn=true;$("fin").textContent="✦ ✦ ✦";
+  const types=SHELLS.map(x=>x.id),keys=Object.keys(COLS),pick=a=>a[Math.floor(Math.random()*a.length)];
+  const mix=()=>{const n=1+Math.floor(Math.random()*3),c=[];while(c.length<n){const k=pick(keys);if(!c.includes(k))c.push(k)}return c};
+  let t=0;const N=26;
+  for(let i=0;i<N;i++){ // starts unhurried, then quickens
+    const gap=.55-(.42*i/N)+Math.random()*.12;t+=gap;
+    setTimeout(()=>launch(W*(.12+Math.random()*.76),HZ*(.14+Math.random()*.36),90+Math.random()*120,pick(types),mix()),t*1000);
+    if(i>N*.6&&Math.random()<.45)setTimeout(()=>launch(W*(.12+Math.random()*.76),HZ*(.14+Math.random()*.36),80+Math.random()*90,pick(types),mix()),(t+.08)*1000);
+  }
+  const end=(t+.6)*1000;
+  for(let i=0;i<8;i++)setTimeout(()=>launch(W*(.1+.8*i/7)+(Math.random()-.5)*40,HZ*(.16+Math.random()*.22),170+Math.random()*60,pick(types),mix()),end+i*70);
+  setTimeout(()=>{finaleOn=false;$("fin").textContent="finale ✦"},end+3500);
 };
 /* keep this sky: the moment is frozen when you press, then saved as a postcard or a wallpaper */
 let snap=null,lastBX=null;
