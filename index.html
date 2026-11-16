@@ -53,7 +53,7 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-actio
 </head>
 <body>
 <canvas id="c"></canvas>
-<div class="title"><h1>Fire Flowers<span>花火</span></h1><p id="how">Choose a shell and up to two colours. Press and hold in the sky, and let go to launch. Holding longer makes a bigger bloom.</p></div>
+<div class="title"><h1>Fire Flowers<span>花火</span></h1><p id="how">Choose a shell and up to two colours. Press and hold in the sky, and let go to launch. Holding longer makes a bigger bloom. Tap the river to float a lantern.</p></div>
 <div class="mode" id="mode">
   <button data-m="day"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></g></svg>昼 day</button>
   <button data-m="night" class="on"><svg viewBox="0 0 16 16"><path d="M11.5 10.5A5.5 5.5 0 0 1 5.5 2.6a5.5 5.5 0 1 0 6 7.9z" fill="currentColor"/></svg>夜 night</button>
@@ -134,11 +134,11 @@ function showCommission(){
 function setMode(m){MODE=m;document.body.classList.toggle("day",m==="day");[...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.m===m));buildTray();showCommission();setTarget()}
 [...$("mode").children].forEach(b=>b.onclick=()=>{audio();setMode(b.dataset.m)});
 $("free").onclick=()=>{freePlay=true;showCommission();setTarget()};
-let muted=false;$("snd").onclick=()=>{audio();muted=!muted;$("snd").textContent=muted?"sound off":"sound on";if(MASTER)MASTER.gain.value=muted?0:1};
+let muted=false;$("snd").onclick=()=>{audio();muted=!muted;$("snd").textContent=muted?"sound off":"sound on";if(MASTER)MASTER.gain.value=muted?0:.9};
 
 /* ================= canvas ================= */
 const cv=$("c"),ctx=cv.getContext("2d"),sky=document.createElement("canvas"),sx=sky.getContext("2d");
-let W,H,HZ,DPR,stars=[],hills=[],lanterns=[],clouds=[];
+let W,H,HZ,DPR,stars=[],hills=[],lanterns=[],clouds=[],boats=[];
 function resize(){
   DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;HZ=Math.round(H*.7);
   cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -146,6 +146,8 @@ function resize(){
   stars=[...Array(Math.round(W*H/5200))].map(()=>({x:Math.random()*W,y:Math.random()*HZ*.85,r:Math.random()*1.1+.2,p:Math.random()*6}));
   const far=[],near=[];for(let x=-10;x<=W+10;x+=W/14)far.push([x,HZ-38-Math.random()*70]);for(let x=-10;x<=W+10;x+=W/26)near.push([x,HZ-10-Math.random()*16]);hills=[far,near];
   lanterns=[...Array(Math.round(W/55))].map((_,i)=>({x:Math.random()*W,dy:Math.random()*5,c:["#ffd6ea","#f4f6ff","#ffe8f2"][i%3],p:Math.random()*6}));
+  // boats on the river: two lantern houseboats (yakatabune) and one small punt, nearer ones bigger
+  if(!boats.length)boats=[{k:"house",d:.1,s:.5,v:5,x:W*.22,ph:0},{k:"punt",d:.24,s:.62,v:-8,x:W*.7,ph:2},{k:"house",d:.36,s:.82,v:3.5,x:W*.55,ph:4}];
   clouds=[...Array(6)].map(()=>({x:Math.random()*W,y:HZ*(.12+Math.random()*.4),s:60+Math.random()*90,v:4+Math.random()*6}));
 }
 addEventListener("resize",resize);resize();
@@ -153,36 +155,59 @@ const hex2=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const lerpC=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
 const mixH=(n,d)=>`rgb(${lerpC(hex2(n),hex2(d),mT)})`; // night colour → day colour by mT
 
-/* ================= sound: soft, roomy, never shrill ================= */
+/* ================= sound ================= */
+/* Night aims at a real festival heard from the riverbank: a mortar thud on launch, then a sharp
+   crack, a deep body and a sub-bass, rolling back off the hills as echoes, with crackle and hiss
+   after. Brown noise rather than white keeps it warm instead of harsh. Each sound sits in stereo
+   where it bursts, and higher bursts are heard a moment after you see them. */
 let AC=null,MASTER=null,VERB=null;
 function audio(){
   if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(_){return}
-  MASTER=AC.createGain();MASTER.gain.value=muted?0:1;MASTER.connect(AC.destination);
-  // a generated reverb: the sound rolls back off the hills across the river
-  VERB=AC.createConvolver();const len=AC.sampleRate*3,ir=AC.createBuffer(2,len,AC.sampleRate);
-  for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2)}
-  VERB.buffer=ir;const wet=AC.createGain();wet.gain.value=.55;VERB.connect(wet).connect(MASTER);
+  const comp=AC.createDynamicsCompressor();comp.threshold.value=-16;comp.ratio.value=3;comp.attack.value=.004;comp.release.value=.3;
+  MASTER=AC.createGain();MASTER.gain.value=muted?0:.9;MASTER.connect(comp).connect(AC.destination);
+  // a soft, dark reverb: a smoothed noise tail, so it blooms instead of hissing
+  VERB=AC.createConvolver();const len=Math.round(AC.sampleRate*2.8),ir=AC.createBuffer(2,len,AC.sampleRate);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);let lp=0;for(let i=0;i<len;i++){lp+=((Math.random()*2-1)-lp)*.18;d[i]=lp*2.2*Math.pow(1-i/len,2.6)}}
+  VERB.buffer=ir;const wet=AC.createGain();wet.gain.value=.5;VERB.connect(wet).connect(MASTER);
 }
-function out(node,dry=1,wet=1){const g=AC.createGain();g.gain.value=dry;node.connect(g).connect(MASTER);const w=AC.createGain();w.gain.value=wet;node.connect(w).connect(VERB)}
+function panFor(x){return Math.max(-.7,Math.min(.7,(x/W*2-1)*.7))}
+function out(node,dry=1,wet=1,pan=0){
+  let n=node;if(AC.createStereoPanner&&pan){const p=AC.createStereoPanner();p.pan.value=pan;node.connect(p);n=p}
+  const g=AC.createGain();g.gain.value=dry;n.connect(g).connect(MASTER);const w=AC.createGain();w.gain.value=wet;n.connect(w).connect(VERB)}
 function noise(dur){const b=AC.createBuffer(1,Math.max(1,AC.sampleRate*dur),AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=AC.createBufferSource();s.buffer=b;return s}
-function rise(dur,day){ // an airy whoosh climbing, not a whistle
-  if(!AC)return;const t=AC.currentTime,n=noise(dur+.1),f=AC.createBiquadFilter(),g=AC.createGain();
-  f.type="bandpass";f.Q.value=day?1.2:2.5;f.frequency.setValueAtTime(day?300:400,t);f.frequency.exponentialRampToValueAtTime(day?1100:2400,t+dur);
-  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(day?.05:.07,t+dur*.6);g.gain.linearRampToValueAtTime(0,t+dur);
-  n.connect(f).connect(g);out(g,1,.3);n.start(t);
+function brown(dur){const b=AC.createBuffer(1,Math.max(1,AC.sampleRate*dur),AC.sampleRate),d=b.getChannelData(0);let l=0;for(let i=0;i<d.length;i++){l=(l+.02*(Math.random()*2-1))/1.02;d[i]=l*3.5}const s=AC.createBufferSource();s.buffer=b;return s}
+function env(g,t,peak,att,dec){g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+att);g.gain.exponentialRampToValueAtTime(.0001,t+att+dec)}
+function mortar(x){ // the low thud of the shell leaving the tube
+  if(!AC)return;const t=AC.currentTime,pan=panFor(x);
+  const n=brown(.3),f=AC.createBiquadFilter(),g=AC.createGain();f.type="lowpass";f.frequency.value=220;env(g,t,.5,.004,.22);n.connect(f).connect(g);out(g,1,.35,pan);n.start(t);
+  const o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(80,t);o.frequency.exponentialRampToValueAtTime(42,t+.14);env(og,t,.25,.003,.16);o.connect(og);out(og,1,.2,pan);o.start(t);o.stop(t+.25);
 }
-function thump(size,delay){ // a deep, round boom with a long echo
-  if(!AC)return;const t=AC.currentTime+delay;
-  const o=AC.createOscillator(),og=AC.createGain();o.type="sine";o.frequency.setValueAtTime(95,t);o.frequency.exponentialRampToValueAtTime(32,t+.5);
-  og.gain.setValueAtTime(0,t);og.gain.linearRampToValueAtTime(.55*size,t+.01);og.gain.exponentialRampToValueAtTime(.001,t+.9);o.connect(og);out(og,1,.8);o.start(t);o.stop(t+1);
-  const n=noise(.5),f=AC.createBiquadFilter(),g=AC.createGain();f.type="lowpass";f.frequency.setValueAtTime(1400,t);f.frequency.exponentialRampToValueAtTime(120,t+.4);
-  g.gain.setValueAtTime(.25*size,t);g.gain.exponentialRampToValueAtTime(.001,t+.45);n.connect(f).connect(g);out(g,.8,1);n.start(t);
+function rise(dur,day,x){ // a faint airy climb
+  if(!AC)return;const t=AC.currentTime,n=day?noise(dur+.1):brown(dur+.1),f=AC.createBiquadFilter(),g=AC.createGain();
+  f.type="bandpass";f.Q.value=.9;f.frequency.setValueAtTime(day?300:500,t);f.frequency.exponentialRampToValueAtTime(day?1100:1600,t+dur);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(day?.04:.05,t+dur*.5);g.gain.linearRampToValueAtTime(0,t+dur);
+  n.connect(f).connect(g);out(g,1,.25,panFor(x));n.start(t);
 }
-function sizzle(delay,dur=1.6){ // the soft hiss of sparks falling
-  if(!AC)return;const t=AC.currentTime+delay,n=noise(dur),f=AC.createBiquadFilter(),g=AC.createGain();f.type="highpass";f.frequency.value=5000;
-  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.025,t+.2);g.gain.linearRampToValueAtTime(0,t+dur);n.connect(f).connect(g);out(g,1,.4);n.start(t);
+function boom(size,delay,x,far){ // crack + body + sub, then echoes rolling back off the hills
+  if(!AC)return;const t=AC.currentTime+delay,pan=panFor(x),k=far?.22:1,top=far?600:2600;
+  if(!far){const c=noise(.03),cf=AC.createBiquadFilter(),cg=AC.createGain();cf.type="highpass";cf.frequency.value=700;env(cg,t,.55*size,.001,.035);c.connect(cf).connect(cg);out(cg,1,.6,pan);c.start(t)}
+  const b=brown(1.6),bf=AC.createBiquadFilter(),bg=AC.createGain();bf.type="lowpass";bf.frequency.setValueAtTime(top,t);bf.frequency.exponentialRampToValueAtTime(110,t+.7);
+  env(bg,t,.9*size*k,.006,1.2);b.connect(bf).connect(bg);out(bg,1,.9,pan);b.start(t);
+  const o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(58,t);o.frequency.exponentialRampToValueAtTime(27,t+.8);env(og,t,.5*size*k,.008,.9);o.connect(og);out(og,1,.3,pan);o.start(t);o.stop(t+1.1);
+  [[.42,.32,-.5],[.95,.2,.45],[1.6,.12,-.2]].forEach(([dt,amp,sh],i)=>{ // echoes, each a little darker and from somewhere else
+    const e=brown(1.1),ef=AC.createBiquadFilter(),eg=AC.createGain();ef.type="lowpass";ef.frequency.value=420-i*90;env(eg,t+dt,amp*size*k,.05,.9);
+    e.connect(ef).connect(eg);out(eg,1,.8,Math.max(-.8,Math.min(.8,pan+sh)));e.start(t+dt)});
 }
-function crackle(delay){if(!AC)return;for(let i=0;i<16;i++){const t=AC.currentTime+delay+Math.random()*.6,n=noise(.02),f=AC.createBiquadFilter(),g=AC.createGain();f.type="bandpass";f.frequency.value=3000+Math.random()*2000;g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.02);n.connect(f).connect(g);out(g,1,.5);n.start(t)}}
+function crackle(delay,x,count=46,spread=1.3){ // many tiny pops, densest in the middle
+  if(!AC)return;const pan=panFor(x);
+  for(let i=0;i<count;i++){const u=(Math.random()+Math.random()+Math.random())/3,t=AC.currentTime+delay+u*spread,n=noise(.008),f=AC.createBiquadFilter(),g=AC.createGain();
+    f.type="bandpass";f.Q.value=1.4;f.frequency.value=1400+Math.random()*4200;env(g,t,.05+Math.random()*.09,.0005,.012);
+    n.connect(f).connect(g);out(g,1,.45,Math.max(-.9,Math.min(.9,pan+(Math.random()-.5)*.6)));n.start(t)}
+}
+function sizzle(delay,x,dur=1.8,vol=.02){ // stars burning as they fall
+  if(!AC)return;const t=AC.currentTime+delay,n=noise(dur),f=AC.createBiquadFilter(),g=AC.createGain();f.type="highpass";f.frequency.value=3500;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.25);g.gain.exponentialRampToValueAtTime(.0001,t+dur);n.connect(f).connect(g);out(g,1,.35,panFor(x));n.start(t);
+}
 const PENTA=[523.25,587.33,659.25,783.99,880,1046.5,1174.66];
 function chime(n=3,delay=0){ // furin, the glass wind-bell
   if(!AC)return;for(let i=0;i<n;i++){const t=AC.currentTime+delay+i*(.09+Math.random()*.1),fq=PENTA[Math.floor(Math.random()*PENTA.length)];
@@ -201,11 +226,11 @@ const PETAL={
 };
 
 /* ================= fireworks + flowers ================= */
-let rockets=[],parts=[],flashes=[],rafts=[],target=null,lastUser=0;
+let rockets=[],parts=[],flashes=[],rafts=[],smoke=[],glows=[],lamps=[],target=null,lastUser=0;
 function launch(x,y,r,type,cols,ambient=false){
   const dur=.9+(HZ-y)/HZ*.6,day=MODE==="day";
   rockets.push({x0:x+(Math.random()-.5)*60,y0:HZ+4,x1:x,y1:y,t:0,dur,r,type,cols:cols.slice(),ambient,day});
-  if(!ambient)rise(dur,day);
+  if(!ambient){rise(dur,day,x);if(!day)mortar(x)}
 }
 function burst(R){
   const {x1:x,y1:y,r,type,ambient,day}=R,dim=ambient?.35:1,K=2.2;
@@ -216,6 +241,9 @@ function burst(R){
       c1:day?(two&&Math.random()<.5?cb:ca):ca, c2:day?null:(two?cb:lerpC(ca,[255,255,255],.55))},o))}};
   if(!day){
     flashes.push({x,y,r:r*1.3,life:0,max:.4,c:ca,a:.16*dim});
+    glows.push({x,y,r:r*2.4,c:ca,life:0,max:1.8,str:dim});
+    const nS=ambient?3:7;for(let i=0;i<nS&&smoke.length<140;i++){const a=Math.random()*Math.PI*2,d=Math.random()*r*.55;
+      smoke.push({x:x+Math.cos(a)*d,y:y+Math.sin(a)*d*.8,r:r*(.25+Math.random()*.2),gr:6+Math.random()*8,vx:4+Math.random()*5,vy:-1+Math.random()*3,age:0,max:14+Math.random()*8,a:(ambient?.5:1)*(.6+Math.random()*.4)})}
     if(type==="kiku")add(130,(i,n,s,ph)=>[Math.cos(ph)*s*r*K,Math.sin(ph)*s*r*K],{max:1.7+Math.random()*.3,drag:K,g:60,size:1.6,trail:7});
     if(type==="botan"){add(110,(i,n,s,ph)=>[Math.cos(ph)*s*r*K,Math.sin(ph)*s*r*K],{max:1.25,drag:K,g:45,size:2.6,trail:2});
       add(40,(i,n,s,ph)=>[Math.cos(ph)*s*r*K*.45,Math.sin(ph)*s*r*K*.45],{max:1.1,drag:K,g:45,size:2.2,trail:2})}
@@ -223,8 +251,11 @@ function burst(R){
     if(type==="wa"){const tilt=(Math.random()-.5)*.8,sq=.45+Math.random()*.3;
       add(90,(i,n)=>{const a=i/n*Math.PI*2,ex=Math.cos(a),ey=Math.sin(a)*sq;return [(ex*Math.cos(tilt)-ey*Math.sin(tilt))*r*K,(ex*Math.sin(tilt)+ey*Math.cos(tilt))*r*K]},{max:1.6,drag:K,g:30,size:2,trail:5});
       add(24,(i,n,s,ph)=>[Math.cos(ph)*s*r*K*.18,Math.sin(ph)*s*r*K*.18],{max:1.2,drag:K,g:30,size:1.8,trail:2,c1:cb})}
-    if(type==="senrin"){add(12,(i,n)=>{const a=i/n*Math.PI*2+Math.random()*.3,m=.55+Math.random()*.45;return [Math.cos(a)*r*K*m,Math.sin(a)*r*K*m]},{max:.6,drag:K,g:40,size:1.6,trail:7,seed:true});if(!ambient)crackle(.9)}
-    if(!ambient){thump(Math.min(1,r/170)+.25,.25);sizzle(.6)}
+    if(type==="senrin"){add(12,(i,n)=>{const a=i/n*Math.PI*2+Math.random()*.3,m=.55+Math.random()*.45;return [Math.cos(a)*r*K*m,Math.sin(a)*r*K*m]},{max:.6,drag:K,g:40,size:1.6,trail:7,seed:true});if(!ambient)crackle(.95,x,70,1.4)}
+    const late=.12+(1-y/HZ)*.3; // light first, sound a beat later
+    if(!ambient){boom(Math.min(1,r/170)*.75+.3,late,x,false);
+      if(type==="yanagi")sizzle(late+.3,x,3,.03);else if(type==="kiku")sizzle(late+.2,x,1.6,.014);else if(type==="botan")crackle(late+.5,x,18,.8)}
+    else boom(.5,late+.35,x,true); // far-off shows, heard faintly
   }else{
     // flowers: petals that flutter, drift and settle on the river
     const pet=(o)=>Object.assign({flower:true,rot:0,vr:(Math.random()-.5)*4,spin:Math.random()*6,spinV:2+Math.random()*4,ph:Math.random()*6},o);
@@ -258,7 +289,7 @@ function judge(x,y,r){
 /* ================= input ================= */
 let hold=null;
 const sizeFor=t=>Math.min(230,55+t*130)*Math.min(1,W/1200+.15);
-cv.addEventListener("pointerdown",e=>{audio();if(e.clientY>HZ-20)return;hold={x:e.clientX,y:e.clientY,t0:performance.now()}});
+cv.addEventListener("pointerdown",e=>{audio();if(e.clientY>HZ+4){floatLamp(e.clientX,e.clientY);return}if(e.clientY>HZ-20)return;hold={x:e.clientX,y:e.clientY,t0:performance.now()}});
 cv.addEventListener("pointermove",e=>{if(hold){hold.x=e.clientX;hold.y=Math.min(e.clientY,HZ-30)}});
 addEventListener("pointerup",()=>{if(!hold)return;const r=sizeFor((performance.now()-hold.t0)/1000);launch(hold.x,hold.y,r,shell,sel);lastUser=performance.now();judge(hold.x,hold.y,r);hold=null});
 
@@ -300,6 +331,13 @@ function frame(now,warm){
   sx.globalCompositeOperation="lighter";
   flashes.forEach(f=>{f.life+=dt;const a=f.a*(1-f.life/f.max)*(1-mT);const fg=sx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r*2.2);fg.addColorStop(0,`rgba(${f.c},${a})`);fg.addColorStop(1,`rgba(${f.c},0)`);sx.fillStyle=fg;sx.fillRect(0,0,W,HZ)});
   flashes=flashes.filter(f=>f.life<f.max);
+  glows.forEach(g=>g.life+=dt);glows=glows.filter(g=>g.life<g.max);
+  smoke.forEach(m=>{m.age+=dt;m.x+=m.vx*dt;m.y+=m.vy*dt;m.r+=m.gr*dt*(1-m.age/m.max)});smoke=smoke.filter(m=>m.age<m.max);
+  if(mT<.98)smoke.forEach(m=>{const k=m.age/m.max,fade=Math.min(1,m.age*1.5)*(1-k)*(1-mT)*m.a;
+    sx.globalCompositeOperation="source-over";const hg=sx.createRadialGradient(m.x,m.y,0,m.x,m.y,m.r);hg.addColorStop(0,`rgba(120,128,170,${.1*fade})`);hg.addColorStop(1,"rgba(120,128,170,0)");sx.fillStyle=hg;sx.fillRect(m.x-m.r,m.y-m.r,m.r*2,m.r*2);
+    let L=[0,0,0];glows.forEach(g=>{const d=Math.hypot(m.x-g.x,m.y-g.y);if(d>g.r)return;const w=(1-d/g.r)*Math.pow(1-g.life/g.max,1.6)*g.str;L[0]+=g.c[0]*w;L[1]+=g.c[1]*w;L[2]+=g.c[2]*w});
+    const lw=Math.max(L[0],L[1],L[2]);if(lw>4){sx.globalCompositeOperation="lighter";const s=Math.min(1,lw/255),c=L.map(v=>Math.round(v/lw*255)),lg=sx.createRadialGradient(m.x,m.y,0,m.x,m.y,m.r);lg.addColorStop(0,`rgba(${c},${.4*s*fade})`);lg.addColorStop(1,`rgba(${c},0)`);sx.fillStyle=lg;sx.fillRect(m.x-m.r,m.y-m.r,m.r*2,m.r*2)}});
+  sx.globalCompositeOperation="lighter";
   sx.globalCompositeOperation="source-over";
 
   const ink=mixH("#eef0ff","#3a3a66");
@@ -350,9 +388,76 @@ function frame(now,warm){
   // flower rafts floating downstream
   rafts.forEach(r=>{r.age+=dt;r.x+=r.vx*dt;r.rot+=.15*dt;const k=r.age/r.max;drawPetal(ctx,r,(k<.6?.9:.9*(1-(k-.6)/.4))*r.dim,.45)});
   rafts=rafts.filter(r=>r.age<r.max);
+  lamps.forEach(l=>{l.age+=dt;l.x+=l.vx*dt/W});lamps=lamps.filter(l=>l.x*W<W+40&&l.age<90);
+  [...lamps.map(l=>({y:HZ+l.fd*(H-HZ),f:()=>drawLamp(l,T)})),...boats.map(b=>({y:HZ+8+b.d*(H-HZ)*.62,f:()=>drawBoat(b,dt,T)}))].sort((a,b)=>a.y-b.y).forEach(o=>o.f());
 
   drawPreview(dt);
   if(!warm)requestAnimationFrame(frame);
+}
+
+/* ================= floating lanterns (tōrō nagashi) ================= */
+function floatLamp(x,y){
+  if(lamps.length>40)lamps.shift();
+  const d=Math.max(0,Math.min(1,(y-HZ)/((H-HZ)*.7)));
+  lamps.push({x:x/W,fd:(y-HZ)/(H-HZ),s:.55+d*.7,vx:9+Math.random()*7,ph:Math.random()*6,age:0,c:hex2(palette()[sel[0]])});
+  if(AC){const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(520,t);o.frequency.exponentialRampToValueAtTime(260,t+.12);env(g,t,.07,.004,.25);o.connect(g);out(g,1,.6,panFor(x));o.start(t);o.stop(t+.3)}
+}
+function drawLamp(l,T){
+  const night=1-mT,bob=Math.sin(T*1.6+l.ph)*1.2,x=l.x*W,y=HZ+l.fd*(H-HZ)+bob,s=l.s,born=Math.min(1,l.age*2),c=l.c;
+  const warm=lerpC(c,[255,236,242],.55);
+  // ring where it touched the water
+  if(l.age<1.6){ctx.strokeStyle=mT>.5?`rgba(255,255,255,${.5*(1-l.age/1.6)})`:`rgba(${warm},${.45*(1-l.age/1.6)})`;ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(x-l.vx*l.age*.5,y-bob+2*s,(6+l.age*26)*s,(2+l.age*7)*s,0,0,7);ctx.stroke()}
+  // glow on the water and its long shimmering reflection
+  if(night>.05){ctx.save();ctx.globalCompositeOperation="lighter";
+    const g=ctx.createRadialGradient(x,y,0,x,y,34*s);g.addColorStop(0,`rgba(${warm},${.35*night*born})`);g.addColorStop(1,`rgba(${warm},0)`);ctx.fillStyle=g;ctx.fillRect(x-34*s,y-34*s,68*s,68*s);
+    for(let j=0;j<7;j++){const yy=y+5*s+j*3.6*s,xx=x+Math.sin(T*3+j+l.ph)*2.5*s;ctx.fillStyle=`rgba(${warm},${.22*night*born*(1-j/7)})`;ctx.fillRect(xx-4*s,yy,8*s,1.5*s)}
+    ctx.restore()}
+  ctx.save();ctx.translate(x,y);ctx.scale(s*born,s*born);ctx.rotate(Math.sin(T*1.2+l.ph)*.05);
+  ctx.fillStyle=mixH("#1a1020","#6b4c43");ctx.fillRect(-8,-1,16,3);          // wooden base
+  ctx.fillStyle=night>.5?`rgb(${warm})`:`rgb(${lerpC(c,[255,255,255],.7)})`; // paper sides
+  ctx.fillRect(-6,-13,12,12);
+  ctx.fillStyle=`rgba(${c},${.35+.25*night})`;ctx.fillRect(-6,-13,12,3);     // coloured band
+  ctx.strokeStyle=mixH("#2a1830","#6b4c43");ctx.lineWidth=.8;ctx.strokeRect(-6,-13,12,12);ctx.beginPath();ctx.moveTo(0,-13);ctx.lineTo(0,-1);ctx.stroke();
+  if(night>.05){ctx.globalCompositeOperation="lighter";const f=.8+.2*Math.sin(T*9+l.ph*3);const g=ctx.createRadialGradient(0,-7,0,0,-7,14);g.addColorStop(0,`rgba(255,240,220,${.5*night*f})`);g.addColorStop(1,"rgba(255,240,220,0)");ctx.fillStyle=g;ctx.fillRect(-14,-21,28,28)}
+  ctx.restore();
+}
+
+/* ================= boats ================= */
+const HULL=new Path2D("M-50 -4 L46 -4 Q58 -8 64 -20 L60 -3 Q55 7 42 9 L-42 9 Q-50 7 -52 -1Z");
+const CABIN=new Path2D("M-36 -4 L-36 -21 L30 -21 L30 -4Z");
+const ROOF=new Path2D("M-43 -20 Q-4 -27 37 -20 L34 -25 Q-4 -33 -40 -25Z");
+const PUNT=new Path2D("M-34 -2 L30 -2 Q40 -5 44 -12 L41 -1 Q37 5 28 6 L-28 6 Q-35 5 -36 0Z");
+function drawBoat(b,dt,T){
+  const span=W+260;b.x+=b.v*dt;if(b.x>W+130)b.x-=span;if(b.x<-130)b.x+=span;
+  const y=HZ+8+b.d*(H-HZ)*.62+Math.sin(T*1.1+b.ph)*1.4,tilt=Math.sin(T*.8+b.ph)*.025,sc=b.s*Math.min(1.2,W/1100+.2),dir=b.v<0?-1:1;
+  const night=1-mT,hull=mixH("#05061a","#6b4c43"),cab=mixH("#0a0d2c","#f3ece0"),roof=mixH("#03040f","#3f4a5a");
+  const lights=[-28,-18,-8,2,12,22];
+  // reflection: a dark squashed copy, and the lit windows smeared as shimmer
+  ctx.save();ctx.translate(b.x,y+9*sc);ctx.scale(sc*dir,-sc*.55);ctx.globalAlpha=.28;ctx.fillStyle=hull;ctx.fill(b.k==="house"?HULL:PUNT);ctx.restore();
+  if(b.k==="house"&&night>.05){ctx.save();ctx.globalCompositeOperation="lighter";
+    lights.forEach((lx,i)=>{for(let j=0;j<5;j++){const yy=y+12*sc+j*4*sc,xx=b.x+lx*sc*dir+Math.sin(T*3+j+i)*2.5*sc;ctx.fillStyle=`rgba(255,214,234,${.16*night*(1-j/5)})`;ctx.fillRect(xx-3*sc,yy,6*sc,1.6*sc)}});
+    ctx.restore()}
+  ctx.save();ctx.translate(b.x,y);ctx.rotate(tilt);ctx.scale(sc*dir,sc);
+  if(b.k==="house"){
+    ctx.fillStyle=cab;ctx.fill(CABIN);
+    // windows: warm by night, shaded by day
+    lights.forEach(lx=>{ctx.fillStyle=night>.5?`rgba(255,226,236,${.55+.35*night})`:"rgba(70,80,100,.35)";ctx.fillRect(lx,-17,7,9)});
+    ctx.fillStyle=roof;ctx.fill(ROOF);
+    // a string of paper lanterns under the eaves
+    for(let i=0;i<7;i++){const lx=-36+i*11,ly=-19+Math.sin(i*.9)*.6;
+      if(night>.05){ctx.globalCompositeOperation="lighter";const g=ctx.createRadialGradient(lx,ly,0,lx,ly,9);g.addColorStop(0,`rgba(255,126,182,${.55*night})`);g.addColorStop(1,"rgba(255,126,182,0)");ctx.fillStyle=g;ctx.fillRect(lx-9,ly-9,18,18);ctx.globalCompositeOperation="source-over"}
+      ctx.fillStyle=mixH("#ff9cc7","#d9566f");ctx.beginPath();ctx.ellipse(lx,ly,2.2,2.8,0,0,7);ctx.fill()}
+  }else{
+    // a boatman with a pole
+    ctx.fillStyle=mixH("#03040f","#2f3442");ctx.beginPath();ctx.ellipse(-14,-14,3.4,6.5,0,0,7);ctx.fill();
+    ctx.beginPath();ctx.ellipse(-14,-22,6.5,2,0,0,7);ctx.fill(); // straw hat
+    ctx.strokeStyle=mixH("#03040f","#5b4a3e");ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(-26,-30);ctx.lineTo(-4,8);ctx.stroke();
+    if(night>.05){ctx.globalCompositeOperation="lighter";const g=ctx.createRadialGradient(26,-14,0,26,-14,14);g.addColorStop(0,`rgba(255,226,236,${.7*night})`);g.addColorStop(1,"rgba(255,226,236,0)");ctx.fillStyle=g;ctx.fillRect(12,-28,28,28);ctx.globalCompositeOperation="source-over";
+      ctx.fillStyle="#ffe2ec";ctx.beginPath();ctx.ellipse(26,-14,2.4,3.2,0,0,7);ctx.fill()}
+    ctx.strokeStyle=mixH("#03040f","#5b4a3e");ctx.beginPath();ctx.moveTo(26,-2);ctx.lineTo(26,-11);ctx.stroke();
+  }
+  ctx.fillStyle=hull;ctx.fill(b.k==="house"?HULL:PUNT);
+  ctx.restore();
 }
 
 /* little live preview in the tray of what you'll launch */
@@ -376,6 +481,7 @@ if(Q.has("demo")){
   lastUser=performance.now()+1e9;
   const show=[["kiku",["kingfisher"],.5,.26,170],["botan",["sakura","silver"],.25,.42,100],["wa",["wisteria"],.76,.22,110],["yanagi",["silver"],.64,.34,150],["senrin",["jade"],.36,.22,120]];
   show.forEach(([t,c,fx,fy,r],i)=>demoQ.push([i*.18,()=>launch(fx*W,fy*HZ,r,t,c)]));
+  if(Q.has("lamps"))[[.2,.1],[.34,.3],[.47,.18],[.6,.4],[.8,.22]].forEach(([fx,fd])=>floatLamp(W*fx,HZ+(H-HZ)*fd));
   const until=+(Q.get("t")||0);for(let i=0;i<until*60;i++)frame(performance.now(),true);
 }
 requestAnimationFrame(frame);
