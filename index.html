@@ -169,6 +169,7 @@ function audio(){
   VERB=AC.createConvolver();const len=Math.round(AC.sampleRate*2.8),ir=AC.createBuffer(2,len,AC.sampleRate);
   for(let c=0;c<2;c++){const d=ir.getChannelData(c);let lp=0;for(let i=0;i<len;i++){lp+=((Math.random()*2-1)-lp)*.18;d[i]=lp*2.2*Math.pow(1-i/len,2.6)}}
   VERB.buffer=ir;const wet=AC.createGain();wet.gain.value=.5;VERB.connect(wet).connect(MASTER);
+  ambience();
 }
 function panFor(x){return Math.max(-.7,Math.min(.7,(x/W*2-1)*.7))}
 function out(node,dry=1,wet=1,pan=0){
@@ -291,7 +292,7 @@ function judge(x,y,r){
 let hold=null;
 const sizeFor=t=>Math.min(230,55+t*130)*Math.min(1,W/1200+.15);
 cv.addEventListener("pointerdown",e=>{audio();if(e.clientY>HZ+4){floatLamp(e.clientX,e.clientY);return}if(e.clientY>HZ-20)return;hold={x:e.clientX,y:e.clientY,t0:performance.now()}});
-cv.addEventListener("pointermove",e=>{if(hold){hold.x=e.clientX;hold.y=Math.min(e.clientY,HZ-30)}});
+cv.addEventListener("pointermove",e=>{PX=e.clientX;PY=e.clientY;if(hold){hold.x=e.clientX;hold.y=Math.min(e.clientY,HZ-30)}});
 addEventListener("pointerup",()=>{if(!hold)return;const r=sizeFor((performance.now()-hold.t0)/1000);launch(hold.x,hold.y,r,shell,sel);remember(hold.x,hold.y,r);lastUser=performance.now();judge(hold.x,hold.y,r);hold=null});
 
 /* ================= drawing helpers ================= */
@@ -328,6 +329,8 @@ function frame(now,warm){
   const mx=W*.9,my=HZ*.46-mT*HZ*.22,glow=sx.createRadialGradient(mx,my,0,mx,my,90+mT*80);
   glow.addColorStop(0,mT>.5?`rgba(255,250,235,${.5*mT})`:`rgba(238,240,255,${.18*(1-mT)})`);glow.addColorStop(1,"rgba(255,255,255,0)");
   sx.fillStyle=glow;sx.fillRect(mx-180,my-180,360,360);sx.fillStyle=mixH("#f4f6ff","#fffdf3");sx.beginPath();sx.arc(mx,my,13+mT*7,0,7);sx.fill();
+  const dusk=Math.max(0,1-Math.abs(mT-.5)*2.2);
+  if(dusk>.01){const dg=sx.createLinearGradient(0,HZ*.25,0,HZ);dg.addColorStop(0,"rgba(122,60,255,0)");dg.addColorStop(.55,`rgba(208,90,170,${.35*dusk})`);dg.addColorStop(1,`rgba(255,150,190,${.55*dusk})`);sx.fillStyle=dg;sx.fillRect(0,0,W,HZ)}
   if(mT>.02)clouds.forEach(c=>{c.x+=c.v*dt;if(c.x-c.s*2>W)c.x=-c.s*2;sx.globalAlpha=.75*mT;
     for(let k=0;k<4;k++){const cx=c.x+(k-1.5)*c.s*.5,cy=c.y+Math.sin(k*1.7)*c.s*.12,rr=c.s*(.45+.15*Math.sin(k*2.3)),cg=sx.createRadialGradient(cx,cy,0,cx,cy,rr);cg.addColorStop(0,"rgba(255,255,255,.8)");cg.addColorStop(1,"rgba(255,255,255,0)");sx.fillStyle=cg;sx.fillRect(cx-rr,cy-rr,rr*2,rr*2)}sx.globalAlpha=1});
 
@@ -365,6 +368,7 @@ function frame(now,warm){
     p.x+=p.vx*dt;p.y+=p.vy*dt;
     if(p.seed&&p.age>=p.max)born.push(p);
     if(p.flower&&p.y>HZ+2&&!p.seed){ // landed on the river: becomes part of a flower raft (花筏)
+      if(ripples.length<60&&Math.random()<.5)ripples.push({x:p.x,y:HZ+3+Math.random()*Math.min(60,(H-HZ)*.35),age:0,s:.6+Math.random()*.6});
       if(rafts.length<500)rafts.push({x:p.x,y:HZ+3+Math.random()*Math.min(60,(H-HZ)*.35),shape:p.shape,c1:p.c1,size:p.size*.8,rot:p.rot,spin:0,age:0,max:7+Math.random()*4,vx:6+Math.random()*8,dim:p.dim});p.age=p.max}
   });
   born.forEach(spawnMini);
@@ -388,14 +392,76 @@ function frame(now,warm){
   ctx.globalAlpha=1;
   ctx.strokeStyle=mT>.5?"rgba(255,255,255,.18)":"rgba(238,240,255,.05)";ctx.lineWidth=1;
   for(let i=0;i<14;i++){const y=HZ+8+((i*37+T*6)%(H-HZ-8)),x=(i*173)%W;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+40+i*3,y);ctx.stroke()}
+  waterLight(T,mx);
+  ripples.forEach(r=>{r.age+=dt;const k=r.age/2.2;ctx.strokeStyle=mT>.5?`rgba(255,255,255,${.45*(1-k)})`:`rgba(238,240,255,${.25*(1-k)})`;ctx.lineWidth=.8;ctx.beginPath();ctx.ellipse(r.x,r.y,(3+r.age*16)*r.s,(1+r.age*4)*r.s,0,0,7);ctx.stroke()});ripples=ripples.filter(r=>r.age<2.2);
   // flower rafts floating downstream
   rafts.forEach(r=>{r.age+=dt;r.x+=r.vx*dt;r.rot+=.15*dt;const k=r.age/r.max;drawPetal(ctx,r,(k<.6?.9:.9*(1-(k-.6)/.4))*r.dim,.45)});
   rafts=rafts.filter(r=>r.age<r.max);
   lamps.forEach(l=>{l.age+=dt;l.x+=l.vx*dt/W});lamps=lamps.filter(l=>l.x*W<W+40&&l.age<90);
   [...lamps.map(l=>({y:HZ+l.fd*(H-HZ),f:()=>drawLamp(l,T)})),...boats.map(b=>({y:HZ+8+b.d*(H-HZ)*.62,f:()=>drawBoat(b,dt,T)}))].sort((a,b)=>a.y-b.y).forEach(o=>o.f());
 
+  creatures(dt,T);
+  fronds(T);
   drawPreview(dt);
   if(!warm)requestAnimationFrame(frame);
+}
+
+/* ================= the world around the show ================= */
+let ripples=[],PX=-999,PY=-999;
+const flies=[...Array(36)].map(()=>({x:Math.random(),y:Math.random(),ph:Math.random()*6,sp:.5+Math.random(),bl:Math.random()*6}));
+const flutter=[...Array(6)].map((_,i)=>({x:Math.random(),y:.55+Math.random()*.35,ph:Math.random()*6,c:Object.keys(COLS)[i%6],vx:(Math.random()<.5?-1:1)*(.012+Math.random()*.012)}));
+function creatures(dt,T){
+  const night=1-mT;
+  if(night>.03){ctx.save();ctx.globalCompositeOperation="lighter";
+    flies.forEach(f=>{ // fireflies along the bank, drifting toward your cursor
+      let x=f.x*W+Math.sin(T*.4*f.sp+f.ph)*40,y=HZ-50+f.y*120+Math.sin(T*.7*f.sp+f.ph*2)*16;
+      const d=Math.hypot(PX-x,PY-y);if(d<220){f.x+=(PX-x)/W*.0025;f.y+=(PY-y)/120*.0025}
+      f.x=(f.x+1)%1;f.y=Math.max(0,Math.min(1,f.y+(Math.random()-.5)*.002));
+      const blink=Math.max(0,Math.sin(T*1.6*f.sp+f.bl))**3*night;if(blink<.02)return;
+      const g=ctx.createRadialGradient(x,y,0,x,y,9);g.addColorStop(0,`rgba(220,255,140,${.75*blink})`);g.addColorStop(1,"rgba(220,255,140,0)");ctx.fillStyle=g;ctx.fillRect(x-9,y-9,18,18)});
+    ctx.restore()}
+  if(mT>.03){flutter.forEach(b=>{ // butterflies over the water, shy of your cursor
+      b.x+=b.vx*dt;if(b.x>1.08)b.x=-.08;if(b.x<-.08)b.x=1.08;
+      let x=b.x*W,y=HZ-90+b.y*110+Math.sin(T*1.3+b.ph)*18;
+      const d=Math.hypot(PX-x,PY-y);if(d<120){b.y=Math.max(0,Math.min(1,b.y+(y-PY)/Math.max(30,d)*.01));b.vx+=(x-PX)/W*.002}
+      b.vx=Math.max(-.04,Math.min(.04,b.vx));
+      const flap=Math.abs(Math.sin(T*9+b.ph)),c=DAYCOLS[b.c];
+      ctx.save();ctx.translate(x,y);ctx.globalAlpha=mT;ctx.fillStyle=c;
+      [-1,1].forEach(sd=>{ctx.save();ctx.scale(sd*(.25+.75*flap),1);ctx.beginPath();ctx.ellipse(4,-2,4.5,3.4,-.4,0,7);ctx.ellipse(3.4,2.4,3,2.2,.5,0,7);ctx.fill();ctx.restore()});
+      ctx.fillStyle="#2f3442";ctx.fillRect(-.6,-3,1.2,6);ctx.restore()});ctx.globalAlpha=1}
+}
+function waterLight(T,mx){ // a path of moonlight by night, glitter under the sun by day
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  for(let y=HZ+4,i=0;y<H;y+=4,i++){const depth=(y-HZ)/(H-HZ),w=(8+depth*70)*(.6+.4*Math.sin(i*1.7+T*2.3)),x=mx+Math.sin(i*.9+T*1.1)*depth*14;
+    const a=(.14*(1-mT)+.2*mT)*(1-depth*.6)*Math.max(0,Math.sin(i*2.1+T*3));
+    if(a<.01)continue;ctx.fillStyle=mT>.5?`rgba(255,252,235,${a})`:`rgba(238,240,255,${a})`;ctx.fillRect(x-w/2,y,w,1.4)}
+  if(mT>.3)for(let k=0;k<18;k++){const x=(k*137.5+Math.floor(T*2+k)*53)%W,y=HZ+6+((k*61)%(H-HZ-10)),tw=Math.max(0,Math.sin(T*6+k*1.3));if(tw<.6)continue;
+    ctx.fillStyle=`rgba(255,255,255,${(tw-.6)*1.6*mT})`;ctx.fillRect(x-2,y,4,1);ctx.fillRect(x-.5,y-1.5,1,4)}
+  ctx.restore();
+}
+function fronds(T){ // weeping willow hanging into the frame at both edges
+  const dark=mixH("#03050f","#5f8a5a"),leaf=mixH("#0a1424","#86b27c");
+  [[-6,1],[W+6,-1]].forEach(([x0,dir])=>{
+    for(let i=0;i<8;i++){const ox=x0+dir*(i*5.5+(i%3)*3),len=HZ*(.22+((i*37)%10)/22),sw=Math.sin(T*.7+i*.8)*10;
+      ctx.strokeStyle=dark;ctx.globalAlpha=.85;ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(ox,-10);ctx.quadraticCurveTo(ox+dir*14+sw*.5,len*.5,ox+dir*6+sw,len);ctx.stroke();
+      ctx.fillStyle=leaf;for(let t=.12;t<1;t+=.07){const px=ox+(dir*14+sw*.5)*2*t*(1-t)+(dir*6+sw)*t*t,py=len*t;
+        ctx.save();ctx.translate(px,py);ctx.rotate(dir*(.5+.3*Math.sin(t*20+i))+sw*.01);ctx.beginPath();ctx.ellipse(dir*3,2,1.4,4.5,0,0,7);ctx.fill();ctx.restore()}
+    }});
+  ctx.globalAlpha=1;
+}
+/* ambience: the river by day and night, crickets at night, birds by day (quiet; follows the mute button) */
+function ambience(){
+  const loop=AC.createBufferSource();loop.buffer=(()=>{const b=AC.createBuffer(1,AC.sampleRate*6,AC.sampleRate),d=b.getChannelData(0);let l=0;for(let i=0;i<d.length;i++){l=(l+.02*(Math.random()*2-1))/1.02;d[i]=l*3}return b})();loop.loop=true;
+  const lf=AC.createBiquadFilter();lf.type="lowpass";lf.frequency.value=650;const lg=AC.createGain();lg.gain.value=.05;
+  const lfo=AC.createOscillator(),lfg=AC.createGain();lfo.frequency.value=.13;lfg.gain.value=.02;lfo.connect(lfg).connect(lg.gain);lfo.start();
+  loop.connect(lf).connect(lg);out(lg,1,.15);loop.start();
+  setInterval(()=>{if(!AC||muted)return;const night=1-mT;
+    if(night>.4&&Math.random()<.8){ // a cricket: three quick chirps
+      const f=4300+Math.random()*500,pan=(Math.random()-.5)*1.4;for(let i=0;i<3;i++){const t=AC.currentTime+i*.07,o=AC.createOscillator(),g=AC.createGain();o.frequency.value=f;env(g,t,.012*night,.004,.04);o.connect(g);out(g,1,.3,pan);o.start(t);o.stop(t+.06)}}
+    if(mT>.4&&Math.random()<.3){ // a bird: a short rising-falling call
+      const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain(),f=2200+Math.random()*1400;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*1.35,t+.07);o.frequency.exponentialRampToValueAtTime(f*.9,t+.16);
+      env(g,t,.025*mT,.01,.16);o.connect(g);out(g,1,.4,(Math.random()-.5)*1.2);o.start(t);o.stop(t+.25)}
+  },900);
 }
 
 /* ================= floating lanterns (tōrō nagashi) ================= */
