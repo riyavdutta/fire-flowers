@@ -17,6 +17,7 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-actio
 .title{position:fixed;left:34px;top:28px;pointer-events:none}
 .title h1{font-family:"Shippori Mincho",serif;font-weight:400;font-size:34px;margin:0;letter-spacing:.04em}
 .title h1 span{font-size:20px;opacity:.6;margin-left:10px}
+.title .by{margin:4px 0 0;font-size:11px;letter-spacing:.14em;color:var(--dim);display:block!important}
 .title p{margin:6px 0 0;font-size:13px;color:var(--dim);letter-spacing:.04em;max-width:32ch;line-height:1.5}
 .card{position:fixed;right:34px;top:28px;text-align:right;max-width:300px;pointer-events:none}
 .card .k{font-size:11px;letter-spacing:.24em;color:var(--dim)}
@@ -70,7 +71,7 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-actio
 </head>
 <body>
 <canvas id="c"></canvas>
-<div class="title"><h1>Fire Flowers<span>花火</span></h1><p id="how">Choose a shell and up to three colours. Press and hold in the sky, and let go to launch. Holding longer makes a bigger bloom. Tap the river to float a lantern.</p></div>
+<div class="title"><h1>Fire Flowers<span>花火</span></h1><p class="by">created by Riya Dutta</p><p id="how">Choose a shell and up to three colours. Press and hold in the sky, and let go to launch. Holding longer makes a bigger bloom. Tap the river to float a lantern.</p></div>
 <div class="mode" id="mode">
   <button data-m="day"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></g></svg>昼 day</button>
   <button data-m="night" class="on"><svg viewBox="0 0 16 16"><path d="M11.5 10.5A5.5 5.5 0 0 1 5.5 2.6a5.5 5.5 0 1 0 6 7.9z" fill="currentColor"/></svg>夜 night</button>
@@ -627,12 +628,13 @@ function cover(g,src,dw,dh,cx){ // crop the frozen sky to fill dw x dh, centred 
   const sw=src.width,sh=src.height,sc=Math.max(dw/sw,dh/sh),cw=dw/sc,ch=dh/sc;
   const x=Math.max(0,Math.min(sw-cw,cx*sw-cw/2)),y=Math.max(0,(sh-ch)/2);g.drawImage(src,x,y,cw,ch,0,0,dw,dh)}
 const FORMATS={
- card(){const PW=1600,m=60,iw=PW-m*2,ih=Math.round(iw*snap.height/snap.width),c=document.createElement("canvas");c.width=PW;c.height=ih+m*2+120;
+ card(){const PW=1600,m=60,iw=PW-m*2,ih=Math.round(iw*snap.height/snap.width),c=document.createElement("canvas");c.width=PW;c.height=ih+m*2+170;
    const g=c.getContext("2d"),day=MODE==="day";g.fillStyle="#f7f1e6";g.fillRect(0,0,c.width,c.height);
    g.save();g.shadowColor="rgba(40,30,60,.25)";g.shadowBlur=30;g.shadowOffsetY=10;g.fillRect(m,m,iw,ih);g.restore();g.drawImage(snap,m,m,iw,ih);
    const ty=m+ih+70,when=new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
    g.fillStyle="#2a2440";g.font='400 44px "Shippori Mincho", serif';g.fillText("Fire Flowers  花火",m,ty);
-   g.font='400 22px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.6)";g.fillText(`${when} · ${(day?"a "+SEASON+" day of flowers":"a "+SEASON+" night of fire flowers")} · ${show.length} launched`,m,ty+38);
+   g.font='400 22px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.6)";g.fillText(`${when} · ${(SEASON==="autumn"?"an ":"a ")+SEASON+(day?" day of flowers":" night of fire flowers")} · ${show.length} launched`,m,ty+38);
+   g.font='400 24px "Shippori Mincho", serif';g.fillStyle="#2a2440";g.fillText(pickNote(day),m,ty+92);
    sealAt(g,PW-m-55,ty-7,104,"#f7f1e6");
    g.font='400 16px "Zen Kaku Gothic New", sans-serif';g.fillStyle="rgba(42,36,64,.45)";g.textAlign="right";g.fillText("fire-flowers.vercel.app",PW-m-130,ty+38);return c},
  desk(){const c=document.createElement("canvas");c.width=2560;c.height=1440;const g=c.getContext("2d");g.imageSmoothingQuality="high";
@@ -640,6 +642,16 @@ const FORMATS={
  phone(){const h=Math.min(2532,snap.height*2),w=Math.round(h*1170/2532),c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.imageSmoothingQuality="high";
    cover(g,snap,w,h,lastBX!=null?lastBX/W:.5);sealAt(g,w/2,h-h*.06,h*.035,"#f7f1e6");return c},
 };
+const NOTES=[
+ ["any","Some flowers only bloom for a second."],["any","The sky keeps none of it. This card does."],["any","A small festival, just for you."],
+ ["any","Hold the moment a little longer."],["any","For whoever was standing beside you."],["any","Somewhere, a boat drifted on."],
+ ["any","Gone before the smoke cleared, kept anyway."],["any","Made of fire, named for flowers."],["any","Wish you were here."],
+ ["night","Light first, then the boom, then the quiet."],["night","One night by the river, kept."],["night","The water caught every one of them."],
+ ["night","Lanterns going downstream, fireworks going up."],["day","Flowers, thrown at the sky."],["day","A day the petals fell upward first."],
+ ["day","Sunlight, petals, and a slow river."],
+ ["spring","Cherry blossom weather."],["summer","A warm night by the water."],["autumn","Maple leaves on the river."],["winter","Snow on the hills, fire in the sky."],
+];
+function pickNote(day){const ok=NOTES.filter(([k])=>k==="any"||k===(day?"day":"night")||k===SEASON);return "“"+ok[Math.floor(Math.random()*ok.length)][1]+"”"}
 const NAMES={card:"postcard",desk:"desktop",phone:"phone"};
 function saveCanvas(c,name){
   c.toBlob(blob=>{
