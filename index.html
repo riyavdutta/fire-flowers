@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fire Flowers 花火</title>
+<meta name="description" content="A small game of flowers and fireworks over a river. Fire flowers by night, real flowers by day.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎆</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--fg:#eef0ff;--dim:rgba(238,240,255,.58);--glass:rgba(10,14,40,.55);--line:rgba(238,240,255,.14);--halo:#070a1f}
+body.day{--fg:#2a2a4a;--dim:rgba(42,42,74,.6);--glass:rgba(255,255,255,.5);--line:rgba(42,42,74,.14);--halo:#eaf3ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#070a1f;color:var(--fg);overflow:hidden;font-family:"Zen Kaku Gothic New",sans-serif;transition:color 1.2s}
+canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-action:none;cursor:crosshair}
+.title,.card{text-shadow:0 0 18px var(--halo),0 0 4px var(--halo)}
+.title{position:fixed;left:34px;top:28px;pointer-events:none}
+.title h1{font-family:"Shippori Mincho",serif;font-weight:400;font-size:34px;margin:0;letter-spacing:.04em}
+.title h1 span{font-size:20px;opacity:.6;margin-left:10px}
+.title p{margin:6px 0 0;font-size:13px;color:var(--dim);letter-spacing:.04em;max-width:32ch;line-height:1.5}
+.card{position:fixed;right:34px;top:28px;text-align:right;max-width:300px;pointer-events:none}
+.card .k{font-size:11px;letter-spacing:.24em;color:var(--dim)}
+.card .q{font-family:"Shippori Mincho",serif;font-size:21px;line-height:1.35;margin-top:6px}
+.marks{display:flex;gap:12px;justify-content:flex-end;margin-top:10px;font-size:12px;color:var(--dim);min-height:18px}
+.marks .ok{color:#3fe0a8}.marks .no{opacity:.45;text-decoration:line-through}
+/* day / night switch */
+.mode{position:fixed;left:50%;top:26px;transform:translateX(-50%);display:flex;padding:4px;border-radius:999px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.mode button{font-family:"Shippori Mincho",serif;font-size:15px;color:var(--fg);background:none;border:0;border-radius:999px;padding:7px 16px;cursor:pointer;opacity:.55;transition:.4s;display:flex;gap:7px;align-items:center}
+.mode button.on{opacity:1;background:var(--line)}
+.mode svg{width:16px;height:16px}
+.tray{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:18px;align-items:center;padding:12px 18px;border-radius:22px;
+  background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);transition:background 1.2s}
+.shells,.cols{display:flex;gap:6px}
+.shell{background:none;border:1px solid transparent;color:var(--fg);border-radius:14px;padding:6px 8px 5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit;min-width:58px;transition:.2s;opacity:.55}
+.shell:hover{opacity:.9}
+.shell.on{opacity:1;border-color:var(--line);background:var(--line)}
+.shell svg{width:30px;height:30px}
+.shell .jp{font-family:"Shippori Mincho";font-size:14px;line-height:1}
+.shell .en{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.sep{width:1px;height:44px;background:var(--line)}
+.colwrap{display:flex;flex-direction:column;gap:6px;align-items:center}
+.colhint{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.col{width:24px;height:24px;border-radius:50%;border:0;cursor:pointer;padding:0;box-shadow:0 0 12px var(--c);background:var(--c);transition:.2s;position:relative}
+.col.on{transform:scale(1.15);outline:1.5px solid var(--fg);outline-offset:3px}
+.col .n{position:absolute;top:-7px;right:-7px;width:13px;height:13px;border-radius:50%;background:var(--fg);color:var(--halo);font-size:8.5px;font-weight:700;line-height:13px;display:none}
+.col.on .n{display:block}
+.preview{position:static;inset:auto;width:46px;height:46px;border-radius:50%;flex:none}
+.corner{position:fixed;right:34px;bottom:30px;display:flex;gap:18px}
+.corner button{font-size:12px;letter-spacing:.1em;color:var(--dim);background:none;border:none;cursor:pointer;font-family:inherit}
+.corner button:hover{color:var(--fg)}
+@media (max-width:820px){.tray{flex-wrap:wrap;justify-content:center;gap:8px;bottom:12px;width:calc(100% - 24px)}.sep,.preview{display:none}.shell{min-width:0;padding:4px}.card{max-width:46vw;top:76px}.card .q{font-size:16px}.title h1{font-size:24px}.title p{display:none}.corner{display:none}.mode{top:auto;bottom:auto;top:60px;left:34px;transform:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title"><h1>Fire Flowers<span>花火</span></h1><p id="how">Choose a shell and up to two colours. Press and hold in the sky, and let go to launch. Holding longer makes a bigger bloom.</p></div>
+<div class="mode" id="mode">
+  <button data-m="day"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></g></svg>昼 day</button>
+  <button data-m="night" class="on"><svg viewBox="0 0 16 16"><path d="M11.5 10.5A5.5 5.5 0 0 1 5.5 2.6a5.5 5.5 0 1 0 6 7.9z" fill="currentColor"/></svg>夜 night</button>
+</div>
+<div class="card"><div class="k" id="k"></div><div class="q" id="q"></div><div class="marks" id="marks"></div></div>
+<div class="tray">
+  <div class="shells" id="shells"></div><div class="sep"></div>
+  <div class="colwrap"><div class="cols" id="cols"></div><div class="colhint">pick one or two</div></div>
+  <canvas class="preview" id="pv" width="92" height="92"></canvas>
+</div>
+<div class="corner"><button id="snd">sound on</button><button id="free">just play →</button></div>
+
+<script>
+/* ================= data ================= */
+const COLS={sakura:"#ff7eb6",wisteria:"#ab8cff",kingfisher:"#45b4ff",jade:"#47f0b4",silver:"#f4f6ff",yuzu:"#fff06a"};
+const DAYCOLS={sakura:"#ff8cbe",wisteria:"#9a7cf5",kingfisher:"#3f9bf0",jade:"#2fcf98",silver:"#ffffff",yuzu:"#ffd93b"};
+const CNAME={day:{silver:"white"},night:{}};
+const ic=(f)=>f; // icons are plain svg strings
+const ICON={
+ kiku:'<g stroke="currentColor" stroke-width="1.3" stroke-linecap="round">'+[...Array(12)].map((_,i)=>{const a=i*Math.PI/6;return `<line x1="${15+Math.cos(a)*4}" y1="${15+Math.sin(a)*4}" x2="${15+Math.cos(a)*13}" y2="${15+Math.sin(a)*13}"/>`}).join("")+'</g>',
+ botan:[...Array(12)].map((_,i)=>{const a=i*Math.PI/6;return `<circle cx="${15+Math.cos(a)*11}" cy="${15+Math.sin(a)*11}" r="1.9" fill="currentColor"/>`}).join("")+[...Array(6)].map((_,i)=>{const a=i*Math.PI/3+.5;return `<circle cx="${15+Math.cos(a)*5}" cy="${15+Math.sin(a)*5}" r="1.5" fill="currentColor"/>`}).join(""),
+ yanagi:'<g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">'+[-1,-.5,0,.5,1].map(d=>`<path d="M15 6 q${d*12} 2 ${d*13} 20"/>`).join("")+'</g>',
+ wa:'<ellipse cx="15" cy="15" rx="12" ry="8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1.5 2.6" transform="rotate(-18 15 15)"/><circle cx="15" cy="15" r="2" fill="currentColor"/>',
+ senrin:[[8,9],[21,8],[15,16],[7,21],[22,21]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-dasharray="1 1.4"/>`).join(""),
+ dkiku:'<g fill="currentColor">'+[...Array(14)].map((_,i)=>`<ellipse cx="15" cy="7" rx="1.2" ry="6" transform="rotate(${i*360/14} 15 15)"/>`).join("")+'</g>',
+ dbotan:'<g fill="currentColor">'+[...Array(6)].map((_,i)=>`<ellipse cx="15" cy="8.5" rx="5" ry="6" opacity=".8" transform="rotate(${i*60} 15 15)"/>`).join("")+'</g>',
+ fuji:'<g fill="currentColor">'+[0,1,2,3,4,5].map(i=>`<ellipse cx="${15+(i%2?2:-2)}" cy="${6+i*3.6}" rx="${4-i*.45}" ry="2" />`).join("")+'</g>',
+ sakura:'<g fill="currentColor">'+[...Array(5)].map((_,i)=>`<path d="M15 15 C19 12 19 7 16.5 5.5 L15 7 L13.5 5.5 C11 7 11 12 15 15Z" transform="rotate(${i*72} 15 15)"/>`).join("")+'</g>',
+ ajisai:'<g fill="currentColor">'+[[9,10],[20,9],[15,16],[9,21],[21,21]].map(([x,y])=>[0,1,2,3].map(k=>`<ellipse cx="${x}" cy="${y-2}" rx="1.6" ry="2.2" transform="rotate(${k*90} ${x} ${y})"/>`).join("")).join("")+'</g>',
+};
+const SHELLS=[ // one shell, two lives: sparks at night, petals by day
+ {id:"kiku",  night:["菊","chrysanth.","kiku"],   day:["菊","chrysanth.","dkiku"]},
+ {id:"botan", night:["牡丹","peony","botan"],     day:["牡丹","peony","dbotan"]},
+ {id:"yanagi",night:["柳","willow","yanagi"],     day:["藤","wisteria","fuji"]},
+ {id:"wa",    night:["輪","ring","wa"],           day:["桜","sakura","sakura"]},
+ {id:"senrin",night:["千輪","thousand","senrin"], day:["紫陽花","hydrangea","ajisai"]},
+];
+const COMMISSIONS={
+ night:[
+  {text:"A kingfisher-blue chrysanthemum, high in the middle of the sky.",type:"kiku",col:"kingfisher",fx:.5,fy:.24,r:170},
+  {text:"A small sakura peony, low on the left, just above the hills.",type:"botan",col:"sakura",fx:.27,fy:.46,r:95},
+  {text:"A silver willow to weep over the river.",type:"yanagi",col:"silver",fx:.64,fy:.3,r:170},
+  {text:"A wisteria ring, high on the right.",type:"wa",col:"wisteria",fx:.76,fy:.2,r:115},
+  {text:"A thousand jade flowers, all at once.",type:"senrin",col:"jade",fx:.44,fy:.28,r:160}],
+ day:[
+  {text:"A cloud of cherry blossom, low over the left bank.",type:"wa",col:"sakura",fx:.3,fy:.45,r:110},
+  {text:"Wisteria pouring down, high in the middle.",type:"yanagi",col:"wisteria",fx:.5,fy:.22,r:160},
+  {text:"A blue hydrangea, small and bright on the right.",type:"senrin",col:"kingfisher",fx:.72,fy:.4,r:100},
+  {text:"A yellow chrysanthemum, high on the right.",type:"kiku",col:"yuzu",fx:.74,fy:.2,r:140},
+  {text:"A white peony, right in the middle.",type:"botan",col:"silver",fx:.5,fy:.32,r:150}],
+};
+
+/* ================= state + ui ================= */
+let MODE="night",mT=0; // mT eases 0 (night) → 1 (day)
+let shell="kiku",sel=["kingfisher"];
+const prog={night:0,day:0};let freePlay=false;
+const $=id=>document.getElementById(id);
+const palette=()=>MODE==="day"?DAYCOLS:COLS;
+function buildTray(){
+  $("shells").innerHTML="";
+  SHELLS.forEach(s=>{const [jp,en,icon]=s[MODE];const b=document.createElement("button");b.className="shell"+(s.id===shell?" on":"");
+    b.innerHTML=`<svg viewBox="0 0 30 30">${ICON[icon]}</svg><span class="jp">${jp}</span><span class="en">${en}</span>`;
+    b.onclick=()=>{shell=s.id;buildTray()};$("shells").appendChild(b)});
+  $("cols").innerHTML="";
+  Object.keys(COLS).forEach(k=>{const b=document.createElement("button");b.className="col"+(sel.includes(k)?" on":"");b.style.setProperty("--c",palette()[k]);b.title=CNAME[MODE][k]||k;
+    b.innerHTML=`<span class="n">${sel.indexOf(k)+1}</span>`;
+    b.onclick=()=>{ // tap toggles; two at most, the oldest drops off
+      if(sel.includes(k)){if(sel.length>1)sel=sel.filter(x=>x!==k)}else{sel.push(k);if(sel.length>2)sel.shift()}
+      buildTray()};$("cols").appendChild(b)});
+  [...$("shells").children].forEach(b=>b.style.color=b.classList.contains("on")?palette()[sel[0]]:"");
+  pvT=0;
+}
+function showCommission(){
+  const list=COMMISSIONS[MODE],i=prog[MODE];$("marks").innerHTML="";
+  if(freePlay||i>=list.length){$("k").textContent=MODE==="day"?"THE DAY IS YOURS":"THE NIGHT IS YOURS";$("q").textContent=i>=list.length?"All five bloomed. Fill the sky however you like.":"No commissions. Just the sky.";return}
+  $("k").textContent=`${MODE==="day"?"DAY":"NIGHT"} COMMISSION · ${i+1} OF ${list.length}`;$("q").textContent=list[i].text;
+}
+function setMode(m){MODE=m;document.body.classList.toggle("day",m==="day");[...$("mode").children].forEach(b=>b.classList.toggle("on",b.dataset.m===m));buildTray();showCommission();setTarget()}
+[...$("mode").children].forEach(b=>b.onclick=()=>{audio();setMode(b.dataset.m)});
+$("free").onclick=()=>{freePlay=true;showCommission();setTarget()};
+let muted=false;$("snd").onclick=()=>{audio();muted=!muted;$("snd").textContent=muted?"sound off":"sound on";if(MASTER)MASTER.gain.value=muted?0:1};
+
+/* ================= canvas ================= */
+const cv=$("c"),ctx=cv.getContext("2d"),sky=document.createElement("canvas"),sx=sky.getContext("2d");
+let W,H,HZ,DPR,stars=[],hills=[],lanterns=[],clouds=[];
+function resize(){
+  DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;HZ=Math.round(H*.7);
+  cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
+  sky.width=W*DPR;sky.height=HZ*DPR;sx.setTransform(DPR,0,0,DPR,0,0);
+  stars=[...Array(Math.round(W*H/5200))].map(()=>({x:Math.random()*W,y:Math.random()*HZ*.85,r:Math.random()*1.1+.2,p:Math.random()*6}));
+  const far=[],near=[];for(let x=-10;x<=W+10;x+=W/14)far.push([x,HZ-38-Math.random()*70]);for(let x=-10;x<=W+10;x+=W/26)near.push([x,HZ-10-Math.random()*16]);hills=[far,near];
+  lanterns=[...Array(Math.round(W/55))].map((_,i)=>({x:Math.random()*W,dy:Math.random()*5,c:["#ffd6ea","#f4f6ff","#ffe8f2"][i%3],p:Math.random()*6}));
+  clouds=[...Array(6)].map(()=>({x:Math.random()*W,y:HZ*(.12+Math.random()*.4),s:60+Math.random()*90,v:4+Math.random()*6}));
+}
+addEventListener("resize",resize);resize();
+const hex2=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const lerpC=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+const mixH=(n,d)=>`rgb(${lerpC(hex2(n),hex2(d),mT)})`; // night colour → day colour by mT
+
+/* ================= sound: soft, roomy, never shrill ================= */
+let AC=null,MASTER=null,VERB=null;
+function audio(){
+  if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(_){return}
+  MASTER=AC.createGain();MASTER.gain.value=muted?0:1;MASTER.connect(AC.destination);
+  // a generated reverb: the sound rolls back off the hills across the river
+  VERB=AC.createConvolver();const len=AC.sampleRate*3,ir=AC.createBuffer(2,len,AC.sampleRate);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2)}
+  VERB.buffer=ir;const wet=AC.createGain();wet.gain.value=.55;VERB.connect(wet).connect(MASTER);
+}
+function out(node,dry=1,wet=1){const g=AC.createGain();g.gain.value=dry;node.connect(g).connect(MASTER);const w=AC.createGain();w.gain.value=wet;node.connect(w).connect(VERB)}
+function noise(dur){const b=AC.createBuffer(1,Math.max(1,AC.sampleRate*dur),AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=AC.createBufferSource();s.buffer=b;return s}
+function rise(dur,day){ // an airy whoosh climbing, not a whistle
+  if(!AC)return;const t=AC.currentTime,n=noise(dur+.1),f=AC.createBiquadFilter(),g=AC.createGain();
+  f.type="bandpass";f.Q.value=day?1.2:2.5;f.frequency.setValueAtTime(day?300:400,t);f.frequency.exponentialRampToValueAtTime(day?1100:2400,t+dur);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(day?.05:.07,t+dur*.6);g.gain.linearRampToValueAtTime(0,t+dur);
+  n.connect(f).connect(g);out(g,1,.3);n.start(t);
+}
+function thump(size,delay){ // a deep, round boom with a long echo
+  if(!AC)return;const t=AC.currentTime+delay;
+  const o=AC.createOscillator(),og=AC.createGain();o.type="sine";o.frequency.setValueAtTime(95,t);o.frequency.exponentialRampToValueAtTime(32,t+.5);
+  og.gain.setValueAtTime(0,t);og.gain.linearRampToValueAtTime(.55*size,t+.01);og.gain.exponentialRampToValueAtTime(.001,t+.9);o.connect(og);out(og,1,.8);o.start(t);o.stop(t+1);
+  const n=noise(.5),f=AC.createBiquadFilter(),g=AC.createGain();f.type="lowpass";f.frequency.setValueAtTime(1400,t);f.frequency.exponentialRampToValueAtTime(120,t+.4);
+  g.gain.setValueAtTime(.25*size,t);g.gain.exponentialRampToValueAtTime(.001,t+.45);n.connect(f).connect(g);out(g,.8,1);n.start(t);
+}
+function sizzle(delay,dur=1.6){ // the soft hiss of sparks falling
+  if(!AC)return;const t=AC.currentTime+delay,n=noise(dur),f=AC.createBiquadFilter(),g=AC.createGain();f.type="highpass";f.frequency.value=5000;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.025,t+.2);g.gain.linearRampToValueAtTime(0,t+dur);n.connect(f).connect(g);out(g,1,.4);n.start(t);
+}
+function crackle(delay){if(!AC)return;for(let i=0;i<16;i++){const t=AC.currentTime+delay+Math.random()*.6,n=noise(.02),f=AC.createBiquadFilter(),g=AC.createGain();f.type="bandpass";f.frequency.value=3000+Math.random()*2000;g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.02);n.connect(f).connect(g);out(g,1,.5);n.start(t)}}
+const PENTA=[523.25,587.33,659.25,783.99,880,1046.5,1174.66];
+function chime(n=3,delay=0){ // furin, the glass wind-bell
+  if(!AC)return;for(let i=0;i<n;i++){const t=AC.currentTime+delay+i*(.09+Math.random()*.1),fq=PENTA[Math.floor(Math.random()*PENTA.length)];
+    [1,2.76,5.4].forEach((m,j)=>{const o=AC.createOscillator(),g=AC.createGain();o.type="sine";o.frequency.value=fq*m;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.05/(j+1),t+.005);g.gain.exponentialRampToValueAtTime(.0005,t+2.4/(j+1));o.connect(g);out(g,.8,.9);o.start(t);o.stop(t+2.5)})}
+}
+function puff(size){if(!AC)return;const t=AC.currentTime,n=noise(.5),f=AC.createBiquadFilter(),g=AC.createGain();f.type="lowpass";f.frequency.setValueAtTime(900,t);f.frequency.exponentialRampToValueAtTime(200,t+.4);g.gain.setValueAtTime(.12*size,t);g.gain.exponentialRampToValueAtTime(.001,t+.45);n.connect(f).connect(g);out(g,1,.6);n.start(t)}
+
+/* ================= petals (day) ================= */
+const P2=s=>new Path2D(s);
+const PETAL={
+ kiku:P2("M0 0 C.13 -.3 .1 -.9 0 -1 C-.1 -.9 -.13 -.3 0 0Z"),
+ botan:P2("M0 0 C.75 -.2 .65 -1 0 -1 C-.65 -1 -.75 -.2 0 0Z"),
+ sakura:P2("M0 0 C.5 -.3 .55 -.85 .22 -1 L0 -.84 L-.22 -1 C-.55 -.85 -.5 -.3 0 0Z"),
+ fuji:P2("M0 0 C.48 -.25 .36 -.8 0 -.9 C-.36 -.8 -.48 -.25 0 0Z"),
+ ajisai:(()=>{const p=new Path2D();for(let k=0;k<4;k++){const a=k*Math.PI/2;const m=new DOMMatrix().rotateSelf(k*90);p.addPath(P2("M0 0 C.32 -.15 .32 -.55 0 -.6 C-.32 -.55 -.32 -.15 0 0Z"),m)}return p})(),
+};
+
+/* ================= fireworks + flowers ================= */
+let rockets=[],parts=[],flashes=[],rafts=[],target=null,lastUser=0;
+function launch(x,y,r,type,cols,ambient=false){
+  const dur=.9+(HZ-y)/HZ*.6,day=MODE==="day";
+  rockets.push({x0:x+(Math.random()-.5)*60,y0:HZ+4,x1:x,y1:y,t:0,dur,r,type,cols:cols.slice(),ambient,day});
+  if(!ambient)rise(dur,day);
+}
+function burst(R){
+  const {x1:x,y1:y,r,type,ambient,day}=R,dim=ambient?.35:1,K=2.2;
+  const pal=day?DAYCOLS:COLS,ca=hex2(pal[R.cols[0]]),cb=hex2(pal[R.cols[1]||R.cols[0]]);
+  const add=(n,fn,o)=>{for(let i=0;i<n;i++){const u=Math.random()*2-1,ph=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u);const [dx,dy]=fn(i,n,s,ph);
+    const two=R.cols.length>1;
+    parts.push(Object.assign({x,y,vx:dx,vy:dy,age:0,hist:[],dim,
+      c1:day?(two&&Math.random()<.5?cb:ca):ca, c2:day?null:(two?cb:lerpC(ca,[255,255,255],.55))},o))}};
+  if(!day){
+    flashes.push({x,y,r:r*1.3,life:0,max:.4,c:ca,a:.16*dim});
+    if(type==="kiku")add(130,(i,n,s,ph)=>[Math.cos(ph)*s*r*K,Math.sin(ph)*s*r*K],{max:1.7+Math.random()*.3,drag:K,g:60,size:1.6,trail:7});
+    if(type==="botan"){add(110,(i,n,s,ph)=>[Math.cos(ph)*s*r*K,Math.sin(ph)*s*r*K],{max:1.25,drag:K,g:45,size:2.6,trail:2});
+      add(40,(i,n,s,ph)=>[Math.cos(ph)*s*r*K*.45,Math.sin(ph)*s*r*K*.45],{max:1.1,drag:K,g:45,size:2.2,trail:2})}
+    if(type==="yanagi")add(80,(i,n,s,ph)=>[Math.cos(ph)*s*r*2.6,Math.sin(ph)*s*r*2.6-30],{max:3.2,drag:1.6,g:95,size:1.3,trail:16,c1:lerpC(ca,[255,244,194],.5),c2:cb,soft:.5});
+    if(type==="wa"){const tilt=(Math.random()-.5)*.8,sq=.45+Math.random()*.3;
+      add(90,(i,n)=>{const a=i/n*Math.PI*2,ex=Math.cos(a),ey=Math.sin(a)*sq;return [(ex*Math.cos(tilt)-ey*Math.sin(tilt))*r*K,(ex*Math.sin(tilt)+ey*Math.cos(tilt))*r*K]},{max:1.6,drag:K,g:30,size:2,trail:5});
+      add(24,(i,n,s,ph)=>[Math.cos(ph)*s*r*K*.18,Math.sin(ph)*s*r*K*.18],{max:1.2,drag:K,g:30,size:1.8,trail:2,c1:cb})}
+    if(type==="senrin"){add(12,(i,n)=>{const a=i/n*Math.PI*2+Math.random()*.3,m=.55+Math.random()*.45;return [Math.cos(a)*r*K*m,Math.sin(a)*r*K*m]},{max:.6,drag:K,g:40,size:1.6,trail:7,seed:true});if(!ambient)crackle(.9)}
+    if(!ambient){thump(Math.min(1,r/170)+.25,.25);sizzle(.6)}
+  }else{
+    // flowers: petals that flutter, drift and settle on the river
+    const pet=(o)=>Object.assign({flower:true,rot:0,vr:(Math.random()-.5)*4,spin:Math.random()*6,spinV:2+Math.random()*4,ph:Math.random()*6},o);
+    const out=(i,n,s,ph,k=1)=>[Math.cos(ph)*s*r*K*k,Math.sin(ph)*s*r*K*k];
+    if(type==="kiku")add(90,(i,n,s,ph)=>out(i,n,s,ph),pet({max:9,drag:K,g:22,size:14,shape:"kiku",align:true}));
+    if(type==="botan"){add(55,(i,n,s,ph)=>out(i,n,s,ph,.9),pet({max:9,drag:K,g:26,size:16,shape:"botan"}));add(20,(i,n,s,ph)=>out(i,n,s,ph,.35),pet({max:9,drag:K,g:26,size:12,shape:"botan"}))}
+    if(type==="yanagi")add(80,(i,n,s,ph)=>[Math.cos(ph)*s*r*2.4,Math.sin(ph)*s*r*2.4-30],pet({max:9,drag:1.6,g:70,size:8,shape:"fuji"}));
+    if(type==="wa")add(120,(i,n,s,ph)=>out(i,n,s,ph),pet({max:10,drag:K,g:18,size:10,shape:"sakura"}));
+    if(type==="senrin")add(10,(i,n)=>{const a=i/n*Math.PI*2+Math.random()*.3,m=.5+Math.random()*.5;return [Math.cos(a)*r*K*m,Math.sin(a)*r*K*m]},{max:.55,drag:K,g:20,size:2,trail:0,seed:true,dayseed:true});
+    if(!ambient){puff(Math.min(1,r/170)+.3);chime(type==="senrin"?5:3,.05)}
+  }
+}
+function spawnMini(p){
+  if(p.dayseed){for(let i=0;i<13;i++){const a=Math.random()*Math.PI*2,s=Math.random()*24;parts.push({flower:true,shape:"ajisai",x:p.x,y:p.y,vx:Math.cos(a)*s*2.2,vy:Math.sin(a)*s*2.2,age:0,hist:[],c1:p.c1,dim:p.dim,max:9+Math.random(),drag:2.2,g:22,size:10,rot:Math.random()*6,vr:(Math.random()-.5)*3,spin:Math.random()*6,spinV:1+Math.random()*2,ph:Math.random()*6})}return}
+  for(let i=0;i<18;i++){const a=i/18*Math.PI*2,rr=26+Math.random()*12;parts.push({x:p.x,y:p.y,vx:Math.cos(a)*rr*2.2+p.vx*.2,vy:Math.sin(a)*rr*2.2+p.vy*.2,age:0,hist:[],c1:p.c1,c2:p.c2,dim:p.dim,max:.9+Math.random()*.3,drag:2.2,g:50,size:1.7,trail:2})}
+}
+
+/* ================= commission ================= */
+function setTarget(){const list=COMMISSIONS[MODE],i=prog[MODE];if(freePlay||i>=list.length){target=null;return}
+  const C=list[i];target={x:C.fx*W,y:C.fy*HZ,r:C.r*Math.min(1,W/1200),col:palette()[C.col],t:0,done:0}}
+function judge(x,y,r){
+  const list=COMMISSIONS[MODE];if(freePlay||prog[MODE]>=list.length||!target)return;
+  const C=list[prog[MODE]],m=MODE;
+  const marks=[["place",Math.hypot(x-target.x,y-target.y)<target.r*.45],["size",Math.abs(r-target.r)<target.r*.32],["flower",shell===C.type],["colour",sel.includes(C.col)]];
+  setTimeout(()=>{if(MODE!==m)return;
+    $("marks").innerHTML=marks.map(([n,ok])=>`<b class="${ok?"ok":"no"}">${ok?"✓ ":""}${n}</b>`).join("");
+    if(marks.every(k=>k[1])){$("q").textContent="Perfect bloom.";target.done=1;setTimeout(()=>{if(MODE!==m)return;prog[m]++;showCommission();setTarget()},2600)}
+  },1300);
+}
+
+/* ================= input ================= */
+let hold=null;
+const sizeFor=t=>Math.min(230,55+t*130)*Math.min(1,W/1200+.15);
+cv.addEventListener("pointerdown",e=>{audio();if(e.clientY>HZ-20)return;hold={x:e.clientX,y:e.clientY,t0:performance.now()}});
+cv.addEventListener("pointermove",e=>{if(hold){hold.x=e.clientX;hold.y=Math.min(e.clientY,HZ-30)}});
+addEventListener("pointerup",()=>{if(!hold)return;const r=sizeFor((performance.now()-hold.t0)/1000);launch(hold.x,hold.y,r,shell,sel);lastUser=performance.now();judge(hold.x,hold.y,r);hold=null});
+
+/* ================= drawing helpers ================= */
+function drawSpark(c,p,k){
+  let a=Math.pow(1-k,1.3)*p.dim*(p.soft||1);if(k>.7&&Math.random()<.3)a*=.3;
+  const col=lerpC(p.c1,p.c2||p.c1,Math.min(1,k*1.6));
+  if(p.hist.length>=4){c.strokeStyle=`rgba(${col},${a*.55})`;c.lineWidth=p.size*.75;c.beginPath();c.moveTo(p.hist[0],p.hist[1]);for(let i=2;i<p.hist.length;i+=2)c.lineTo(p.hist[i],p.hist[i+1]);c.lineTo(p.x,p.y);c.stroke()}
+  c.fillStyle=`rgba(${col},${a})`;c.beginPath();c.arc(p.x,p.y,p.size*(1-k*.4),0,7);c.fill();
+}
+function drawPetal(c,p,a,flat=1){
+  c.save();c.translate(p.x,p.y);c.rotate(p.rot);c.scale(p.size*(.25+.75*Math.abs(Math.cos(p.spin))),p.size*flat);
+  c.globalAlpha=a;c.fillStyle=`rgb(${p.c1})`;c.fill(PETAL[p.shape]);
+  c.globalAlpha=a*.38;c.fillStyle="#fff";c.scale(.55,.6);c.fill(PETAL[p.shape]);
+  c.restore();
+}
+
+/* ================= loop ================= */
+let last=performance.now(),ambientT=1.5,simT=0,demoQ=[];
+function frame(now,warm){
+  const dt=warm?1/60:Math.min(.033,(now-last)/1000);last=now;simT+=dt;const T=simT;
+  while(demoQ.length&&demoQ[0][0]<=simT){const [,f]=demoQ.shift();f()}
+  mT+=((MODE==="day"?1:0)-mT)*Math.min(1,dt*1.6);
+  ambientT-=dt;if(ambientT<0&&now-lastUser>9000){ambientT=3+Math.random()*3;
+    launch(W*(.15+Math.random()*.7),HZ*(.25+Math.random()*.3),50+Math.random()*50,SHELLS[Math.floor(Math.random()*5)].id,[Object.keys(COLS)[Math.floor(Math.random()*6)]],true)}
+
+  /* sky: night indigo melts into a soft spring day */
+  const g=sx.createLinearGradient(0,0,0,HZ);
+  g.addColorStop(0,mixH("#03051a","#8fc6f2"));g.addColorStop(.55,mixH("#0b1240","#c9e4fb"));g.addColorStop(1,mixH("#1d2160","#fbe9f1"));
+  sx.globalCompositeOperation="source-over";sx.fillStyle=g;sx.fillRect(0,0,W,HZ);
+  if(mT<.98)stars.forEach(s=>{sx.fillStyle=`rgba(238,240,255,${(.25+.35*Math.sin(T*1.3+s.p)**2)*(1-mT)})`;sx.fillRect(s.x,s.y,s.r,s.r)});
+  // moon by night, sun by day
+  const mx=W*.9,my=HZ*.46-mT*HZ*.22,glow=sx.createRadialGradient(mx,my,0,mx,my,90+mT*80);
+  glow.addColorStop(0,mT>.5?`rgba(255,250,235,${.5*mT})`:`rgba(238,240,255,${.18*(1-mT)})`);glow.addColorStop(1,"rgba(255,255,255,0)");
+  sx.fillStyle=glow;sx.fillRect(mx-180,my-180,360,360);sx.fillStyle=mixH("#f4f6ff","#fffdf3");sx.beginPath();sx.arc(mx,my,13+mT*7,0,7);sx.fill();
+  if(mT>.02)clouds.forEach(c=>{c.x+=c.v*dt;if(c.x-c.s*2>W)c.x=-c.s*2;sx.globalAlpha=.75*mT;
+    for(let k=0;k<4;k++){const cx=c.x+(k-1.5)*c.s*.5,cy=c.y+Math.sin(k*1.7)*c.s*.12,rr=c.s*(.45+.15*Math.sin(k*2.3)),cg=sx.createRadialGradient(cx,cy,0,cx,cy,rr);cg.addColorStop(0,"rgba(255,255,255,.8)");cg.addColorStop(1,"rgba(255,255,255,0)");sx.fillStyle=cg;sx.fillRect(cx-rr,cy-rr,rr*2,rr*2)}sx.globalAlpha=1});
+
+  sx.globalCompositeOperation="lighter";
+  flashes.forEach(f=>{f.life+=dt;const a=f.a*(1-f.life/f.max)*(1-mT);const fg=sx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r*2.2);fg.addColorStop(0,`rgba(${f.c},${a})`);fg.addColorStop(1,`rgba(${f.c},0)`);sx.fillStyle=fg;sx.fillRect(0,0,W,HZ)});
+  flashes=flashes.filter(f=>f.life<f.max);
+  sx.globalCompositeOperation="source-over";
+
+  const ink=mixH("#eef0ff","#3a3a66");
+  if(target){target.t+=dt;const a=target.done?Math.max(0,.6-target.t*.2):.28+.1*Math.sin(T*2);
+    sx.save();sx.setLineDash([2,7]);sx.lineWidth=1.3;sx.strokeStyle=target.col;sx.globalAlpha=a;sx.beginPath();sx.arc(target.x,target.y,target.r,0,7);sx.stroke();sx.restore()}
+  if(hold){const r=sizeFor((now-hold.t0)/1000);sx.save();sx.strokeStyle=palette()[sel[0]];sx.globalAlpha=.7;sx.lineWidth=1.2;sx.setLineDash([1,5]);sx.beginPath();sx.arc(hold.x,hold.y,r,0,7);sx.stroke();sx.setLineDash([]);sx.beginPath();sx.arc(hold.x,hold.y,2.5,0,7);sx.fillStyle=ink;sx.fill();sx.restore()}
+
+  // rockets (night) and rising buds (day)
+  rockets.forEach(R=>{R.t+=dt/R.dur;const e=1-(1-Math.min(1,R.t))**2,x=R.x0+(R.x1-R.x0)*e+Math.sin(R.t*20)*1.2,y=R.y0+(R.y1-R.y0)*e;
+    if(R.day){if(Math.random()<.35)parts.push({flower:true,shape:"fuji",x,y,vx:(Math.random()-.5)*15,vy:15,age:0,hist:[],c1:[120,190,140],dim:R.ambient?.4:.8,max:1,drag:2,g:20,size:4,rot:Math.random()*6,vr:2,spin:0,spinV:3,ph:0});
+      sx.fillStyle="#5aa66e";sx.globalAlpha=R.ambient?.4:1;sx.beginPath();sx.ellipse(x,y,3,4.5,0,0,7);sx.fill();sx.globalAlpha=1}
+    else if(Math.random()<.9)parts.push({x,y,vx:(Math.random()-.5)*20,vy:20+Math.random()*30,age:0,hist:[],c1:[255,240,220],c2:[120,110,160],max:.45,drag:2,g:40,size:1.1,trail:2,dim:R.ambient?.4:.8});
+    if(R.t>=1){R.done=1;burst(R)}});
+  rockets=rockets.filter(R=>!R.done);
+
+  // particles
+  const born=[];
+  parts.forEach(p=>{
+    p.age+=dt;const d=Math.exp(-p.drag*dt);p.vx*=d;p.vy=p.vy*d+p.g*dt;
+    if(p.flower){if(p.age>.7&&!p.seed&&!p.loose){p.loose=1;p.drag=.9;p.g=48+Math.random()*20}p.vx+=Math.sin(T*1.4+p.ph)*18*dt;p.spin+=p.spinV*dt;p.rot+=p.vr*dt;if(p.align&&p.age<.05)p.rot=Math.atan2(p.vy,p.vx)+Math.PI/2}
+    else{p.hist.push(p.x,p.y);if(p.hist.length>p.trail*2)p.hist.splice(0,2)}
+    p.x+=p.vx*dt;p.y+=p.vy*dt;
+    if(p.seed&&p.age>=p.max)born.push(p);
+    if(p.flower&&p.y>HZ+2&&!p.seed){ // landed on the river: becomes part of a flower raft (花筏)
+      if(rafts.length<500)rafts.push({x:p.x,y:HZ+3+Math.random()*Math.min(60,(H-HZ)*.35),shape:p.shape,c1:p.c1,size:p.size*.8,rot:p.rot,spin:0,age:0,max:7+Math.random()*4,vx:6+Math.random()*8,dim:p.dim});p.age=p.max}
+  });
+  born.forEach(spawnMini);
+  parts=parts.filter(p=>p.age<p.max&&p.y<HZ+20);
+  sx.globalCompositeOperation="lighter";
+  parts.forEach(p=>{if(!p.flower)drawSpark(sx,p,p.age/p.max)});
+  sx.globalCompositeOperation="source-over";
+  parts.forEach(p=>{if(p.flower){const k=p.age/p.max;drawPetal(sx,p,(k<.88?1:1-(k-.88)/.12)*p.dim)}});
+
+  // hills and lanterns
+  [[mixH("#0a0d2c","#9db4c8"),hills[0]],[mixH("#05061a","#6e928a"),hills[1]]].forEach(([c,pts])=>{sx.fillStyle=c;sx.beginPath();sx.moveTo(-10,HZ+2);
+    pts.forEach(([x,y],i)=>{if(!i)sx.lineTo(x,y);else{const [px,py]=pts[i-1];sx.quadraticCurveTo(px,py,(px+x)/2,(py+y)/2)}});sx.lineTo(W+10,HZ+2);sx.fill()});
+  if(mT<.95){sx.globalCompositeOperation="lighter";lanterns.forEach(l=>{const a=(.55+.3*Math.sin(T*2+l.p))*(1-mT),y=HZ-11-l.dy;const lg=sx.createRadialGradient(l.x,y,0,l.x,y,10);lg.addColorStop(0,`rgba(255,214,234,${a*.5})`);lg.addColorStop(1,"rgba(255,214,234,0)");sx.fillStyle=lg;sx.fillRect(l.x-10,y-10,20,20);sx.fillStyle=l.c;sx.globalAlpha=a;sx.beginPath();sx.ellipse(l.x,y,1.4,1.9,0,0,7);sx.fill();sx.globalAlpha=1});sx.globalCompositeOperation="source-over"}
+
+  /* compose: sky, then the river reflecting it in ripples */
+  ctx.drawImage(sky,0,0,W*DPR,HZ*DPR,0,0,W,HZ);
+  const wg=ctx.createLinearGradient(0,HZ,0,H);wg.addColorStop(0,mixH("#0c1038","#a9cfe6"));wg.addColorStop(1,mixH("#03040f","#6f9fbf"));ctx.fillStyle=wg;ctx.fillRect(0,HZ,W,H-HZ);
+  for(let y=HZ,band=2;y<H;y+=band){const depth=(y-HZ)/(H-HZ),src=HZ-(y-HZ)*1.15;if(src<0)break;
+    const off=Math.sin(y*.09+T*2.2)*(2+depth*9)+Math.sin(y*.031-T*1.3)*(1+depth*5);
+    ctx.globalAlpha=(.42-mT*.12)*(1-depth*.75);ctx.drawImage(sky,0,src*DPR,W*DPR,band*DPR,off,y,W,band)}
+  ctx.globalAlpha=1;
+  ctx.strokeStyle=mT>.5?"rgba(255,255,255,.18)":"rgba(238,240,255,.05)";ctx.lineWidth=1;
+  for(let i=0;i<14;i++){const y=HZ+8+((i*37+T*6)%(H-HZ-8)),x=(i*173)%W;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+40+i*3,y);ctx.stroke()}
+  // flower rafts floating downstream
+  rafts.forEach(r=>{r.age+=dt;r.x+=r.vx*dt;r.rot+=.15*dt;const k=r.age/r.max;drawPetal(ctx,r,(k<.6?.9:.9*(1-(k-.6)/.4))*r.dim,.45)});
+  rafts=rafts.filter(r=>r.age<r.max);
+
+  drawPreview(dt);
+  if(!warm)requestAnimationFrame(frame);
+}
+
+/* little live preview in the tray of what you'll launch */
+const pv=$("pv"),pc=pv.getContext("2d");let pvT=0;
+function drawPreview(dt){
+  pvT+=dt;pc.setTransform(1,0,0,1,0,0);pc.clearRect(0,0,92,92);pc.translate(46,46);
+  const pal=palette(),day=MODE==="day",cs=sel.map(k=>hex2(pal[k]));
+  pc.fillStyle=day?"rgba(255,255,255,.55)":"rgba(3,5,26,.85)";pc.beginPath();pc.arc(0,0,44,0,7);pc.fill();
+  const grow=Math.min(1,pvT*1.5),n=day?10:24;
+  for(let i=0;i<n;i++){const a=i/n*Math.PI*2+pvT*.3,rr=grow*30,c=cs[i%cs.length];
+    if(day){const shape={kiku:"kiku",botan:"botan",yanagi:"fuji",wa:"sakura",senrin:"ajisai"}[shell];
+      pc.save();pc.translate(Math.cos(a)*rr*.75,Math.sin(a)*rr*.75+(shell==="yanagi"?grow*8:0));pc.rotate(a+Math.PI/2);pc.scale(9,9);pc.fillStyle=`rgb(${c})`;pc.fill(PETAL[shape]);pc.restore()}
+    else{pc.strokeStyle=`rgba(${c},.8)`;pc.lineWidth=1.2;pc.beginPath();pc.moveTo(Math.cos(a)*rr*.35,Math.sin(a)*rr*.35);pc.lineTo(Math.cos(a)*rr,Math.sin(a)*rr+(shell==="yanagi"?grow*10:0));pc.stroke()}}
+  if(pvT>2.4)pvT=0;
+}
+
+buildTray();showCommission();setTarget();addEventListener("resize",setTarget);
+const Q=new URLSearchParams(location.search);
+if(Q.get("mode")==="day"){setMode("day");mT=1}
+if(Q.has("demo")){
+  lastUser=performance.now()+1e9;
+  const show=[["kiku",["kingfisher"],.5,.26,170],["botan",["sakura","silver"],.25,.42,100],["wa",["wisteria"],.76,.22,110],["yanagi",["silver"],.64,.34,150],["senrin",["jade"],.36,.22,120]];
+  show.forEach(([t,c,fx,fy,r],i)=>demoQ.push([i*.18,()=>launch(fx*W,fy*HZ,r,t,c)]));
+  const until=+(Q.get("t")||0);for(let i=0;i<until*60;i++)frame(performance.now(),true);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
