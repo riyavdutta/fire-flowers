@@ -127,17 +127,17 @@ const SHELLS=[ // one shell, two lives: sparks at night, petals by day
 ];
 const COMMISSIONS={
  night:[
-  {text:"A kingfisher-blue chrysanthemum, high in the middle of the sky.",type:"kiku",col:"kingfisher",fx:.5,fy:.24,r:170},
+  {text:"A kingfisher-blue chrysanthemum, high in the middle of the sky.",type:"kiku",col:"kingfisher",fx:.5,fy:.42,r:130},
   {text:"A small sakura peony, low on the left, just above the hills.",type:"botan",col:"sakura",fx:.27,fy:.46,r:95},
-  {text:"A silver willow to weep over the river.",type:"yanagi",col:"silver",fx:.64,fy:.3,r:170},
-  {text:"A wisteria ring, high on the right.",type:"wa",col:"wisteria",fx:.76,fy:.2,r:115},
-  {text:"A thousand jade flowers, all at once.",type:"senrin",col:"jade",fx:.44,fy:.28,r:160}],
+  {text:"A silver willow to weep over the river.",type:"yanagi",col:"silver",fx:.64,fy:.46,r:150},
+  {text:"A wisteria ring, high on the right.",type:"wa",col:"wisteria",fx:.7,fy:.36,r:105},
+  {text:"A thousand jade flowers, all at once.",type:"senrin",col:"jade",fx:.44,fy:.45,r:140}],
  day:[
   {text:"A cloud of cherry blossom, low over the left bank.",type:"wa",col:"sakura",fx:.3,fy:.45,r:110},
-  {text:"Wisteria pouring down, high in the middle.",type:"yanagi",col:"wisteria",fx:.5,fy:.22,r:160},
+  {text:"Wisteria pouring down, high in the middle.",type:"yanagi",col:"wisteria",fx:.5,fy:.42,r:130},
   {text:"A blue hydrangea, small and bright on the right.",type:"senrin",col:"kingfisher",fx:.72,fy:.4,r:100},
-  {text:"A yellow chrysanthemum, high on the right.",type:"kiku",col:"yuzu",fx:.74,fy:.2,r:140},
-  {text:"A white peony, right in the middle.",type:"botan",col:"silver",fx:.5,fy:.32,r:150}],
+  {text:"A yellow chrysanthemum, high on the right.",type:"kiku",col:"yuzu",fx:.68,fy:.38,r:120},
+  {text:"A white peony, right in the middle.",type:"botan",col:"silver",fx:.5,fy:.48,r:140}],
 };
 
 /* ================= state + ui ================= */
@@ -387,8 +387,14 @@ function frame(now,warm){
   sx.globalCompositeOperation="source-over";
 
   const ink=mixH("#eef0ff","#3a3a66");
-  if(target&&!window.CLEAN){target.t+=dt;const a=target.done?Math.max(0,.6-target.t*.2):.28+.1*Math.sin(T*2);
-    sx.save();sx.setLineDash([2,7]);sx.lineWidth=1.3;sx.strokeStyle=target.col;sx.globalAlpha=a;sx.beginPath();sx.arc(target.x,target.y,target.r,0,7);sx.stroke();sx.restore()}
+  if(target&&!window.CLEAN){target.t+=dt; // the commission's outline: a soft disc, a slowly turning dashed ring, a centre mark
+    const a=target.done?Math.max(0,1-target.t*.35):.75+.2*Math.sin(T*2),tc=hex2(target.col),ring=lerpC(tc,[42,36,80],mT*.45);
+    sx.save();sx.globalAlpha=a;
+    const fg=sx.createRadialGradient(target.x,target.y,target.r*.2,target.x,target.y,target.r);fg.addColorStop(0,`rgba(${tc},${.05+.07*mT})`);fg.addColorStop(1,`rgba(${tc},${.12+.1*mT})`);
+    sx.fillStyle=fg;sx.beginPath();sx.arc(target.x,target.y,target.r,0,7);sx.fill();
+    sx.setLineDash([5,7]);sx.lineDashOffset=-T*8;sx.lineWidth=2;sx.strokeStyle=`rgba(${ring},.9)`;sx.beginPath();sx.arc(target.x,target.y,target.r,0,7);sx.stroke();
+    sx.setLineDash([]);sx.lineWidth=1.5;sx.strokeStyle=`rgba(${ring},.7)`;const m=7;sx.beginPath();sx.moveTo(target.x-m,target.y);sx.lineTo(target.x+m,target.y);sx.moveTo(target.x,target.y-m);sx.lineTo(target.x,target.y+m);sx.stroke();
+    sx.restore()}
   if(hold){const r=sizeFor((now-hold.t0)/1000);sx.save();sx.strokeStyle=palette()[sel[0]];sx.globalAlpha=.7;sx.lineWidth=1.2;sx.setLineDash([1,5]);sx.beginPath();sx.arc(hold.x,hold.y,r,0,7);sx.stroke();sx.setLineDash([]);sx.beginPath();sx.arc(hold.x,hold.y,2.5,0,7);sx.fillStyle=ink;sx.fill();sx.restore()}
 
   // rockets (night) and rising buds (day)
