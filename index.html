@@ -397,7 +397,17 @@ function frame(now,warm){
     sx.setLineDash([5,7]);sx.lineDashOffset=-T*8;sx.lineWidth=2;sx.strokeStyle=`rgba(${ring},.9)`;sx.beginPath();sx.arc(target.x,target.y,target.r,0,7);sx.stroke();
     sx.setLineDash([]);sx.lineWidth=1.5;sx.strokeStyle=`rgba(${ring},.7)`;const m=7;sx.beginPath();sx.moveTo(target.x-m,target.y);sx.lineTo(target.x+m,target.y);sx.moveTo(target.x,target.y-m);sx.lineTo(target.x,target.y+m);sx.stroke();
     sx.restore()}
-  if(hold){const r=sizeFor((now-hold.t0)/1000);sx.save();sx.strokeStyle=palette()[sel[0]];sx.globalAlpha=.7;sx.lineWidth=1.2;sx.setLineDash([1,5]);sx.beginPath();sx.arc(hold.x,hold.y,r,0,7);sx.stroke();sx.setLineDash([]);sx.beginPath();sx.arc(hold.x,hold.y,2.5,0,7);sx.fillStyle=ink;sx.fill();sx.restore()}
+  if(hold){ // the ring you grow while holding: bold enough to compare with the outline, and it lights up when you match it
+    const r=sizeFor((now-hold.t0)/1000),hc=hex2(palette()[sel[0]]),hr=lerpC(hc,[42,36,80],mT*.45);
+    const fits=target&&!target.done&&Math.abs(r-target.r)<target.r*.32&&Math.hypot(hold.x-target.x,hold.y-target.y)<target.r*.45;
+    sx.save();
+    const fg=sx.createRadialGradient(hold.x,hold.y,r*.3,hold.x,hold.y,r);fg.addColorStop(0,`rgba(${hc},0)`);fg.addColorStop(1,`rgba(${hc},${fits?.3:.14+.08*mT})`);
+    sx.fillStyle=fg;sx.beginPath();sx.arc(hold.x,hold.y,r,0,7);sx.fill();
+    if(fits){sx.shadowColor=`rgba(${hc},.9)`;sx.shadowBlur=16}
+    sx.setLineDash(fits?[]:[7,5]);sx.lineDashOffset=T*14;sx.lineWidth=fits?3.2:2.4;sx.strokeStyle=`rgba(${hr},${fits?1:.9})`;
+    sx.beginPath();sx.arc(hold.x,hold.y,r,0,7);sx.stroke();
+    sx.shadowBlur=0;sx.setLineDash([]);sx.beginPath();sx.arc(hold.x,hold.y,3.5,0,7);sx.fillStyle=`rgb(${hr})`;sx.fill();
+    sx.restore()}
 
   // rockets (night) and rising buds (day)
   rockets.forEach(R=>{R.t+=dt/R.dur;const e=1-(1-Math.min(1,R.t))**2,x=R.x0+(R.x1-R.x0)*e+Math.sin(R.t*20)*1.2,y=R.y0+(R.y1-R.y0)*e;
